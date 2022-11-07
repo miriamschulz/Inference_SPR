@@ -1,4 +1,4 @@
-# Self-Paced-Reading study SPR1, August-September 2022
+# Self-Paced-Reading study - SPR1
 
 
 ## 1. General information
@@ -14,18 +14,19 @@ SPR1 experiment on PCIbex: https://farm.pcibex.net/experiments/jDVSWb/edit
 
 ## 2. Files and folders in this directory
 
-- `format_stimuli` folder: contains the R-scripts used to pseudorandomize the lists and put the items into the format required by PC Ibex .csv item tables.
+- `format_stimuli` folder: contains the R-scripts used to pseudorandomize the lists and put the items into the format required by PC Ibex (`.csv` item tables).
 - `ibex_files` folder: contains the PCIbex experiment files
 - `results` folder: contains the full downloaded PCIbex results (`results.csv`) and the R-scripts to process the results:
   - `results_SPR_preprocess.Rmd`:
     - Reads in the raw file from PC Ibex and allows to perform some completeness checks.
-    - Annotates subject and list numbers and button order.
+    - Annotates subject and list numbers / button order.
     - Merges the results with the stimuli file and exports this as `results_reads.csv`.
     - Also exports survey text answers by participants as `Survey_textanswers.csv`.
     - The rest of the script contains several descriptive statistics / plots of the data.
-    - At the end, inspects the instruction reading times per participant to see whether any participants skipped the instructions (ignore 0.000 results here; fix bug).
-  - `results_SPR_analysis.Rmd`: Reads in the preprocessed results file `results_reads.csv`. Performs descriptive and inferential statistics.
+    - At the end, inspects the instruction reading times per participant to see whether any participants skipped the instructions (ignore 0.000 results here; #TODO fix bug).
+  # - `results_SPR_analysis.Rmd`: Reads in the preprocessed results file `results_reads.csv`. Performs descriptive and inferential statistics.
   - `results_SPR_sample.Rmd`: Reads in the preprocessed results file and randomly samples a subset of participants from the data (equally distributed across lists) to (visually) inspect the variation in the data.
+  - `results_SPR_rRT.Rmd`: Reads in the preprocessed results file and performs a regression-based RT analysis.
   - `power_simulation.Rmd`: will contain code for a power simulation for this study (in progress).
 - `safety_copies` folder: contains downloaded safety copies of the full experiment for each order from PC Ibex.
 
