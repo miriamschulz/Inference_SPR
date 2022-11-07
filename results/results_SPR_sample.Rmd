@@ -15,12 +15,10 @@ knitr::opts_chunk$set(echo = TRUE)
 This script randomly samples a subset of participants from the results to get an idea of the variation in the data.
 
 
-
 ## Preliminaries
 
-Workspace, libraries, functions:
-
-```{r include = FALSE}
+```{r, include = FALSE}
+# Workspace, libraries and functions
 rm(list = ls())  # clear workspace (optional)
 library(tidyverse)
 library(grid)
@@ -29,45 +27,11 @@ library(sciplot)  # for se function
 source("results_SPR_functions.R") # custom functions 
 ```
 
-Read in data:
+Read in and preprocess data:
 
-```{r}
+```{r, results = FALSE}
+# Read in preprocessed results file:
 reads <- read.csv("results_reads.csv", header = TRUE)
-
-#Convert variables to numeric / factor:
-reads[ ,c("Subject", "IPhash", "Cond", "Block", "Order", "Plausible", "Region", "PlausibilityRating")] <-
-  lapply(reads[ ,c("Subject", "IPhash", "Cond", "Block", "Order", "Plausible", "Region", "PlausibilityRating")], as.factor)
-
-# Inspect:
-str(reads)
-
-# Data completeness check (for target region)
-xtabs(~ Cond + Subject, filter(reads, Region == 0))
-
-# Check the range of the RTs
-range(reads$RT)
-```
-
-Exclude data:
-
-```{r}
-# Define thresholds for data exclusion
-min.threshold <- 80
-max.threshold <- 1500
-
-# Check the regions concerned by small RTs:
-filter(reads, RT <= min.threshold)$Region
-# Check the regions concerned by large RTs:
-filter(reads, RT >= max.threshold)$Region
-
-# Add log RTs
-reads$logRT <- log(reads$RT)
-
-# Recide whether to use log RTs 
-log.RTs <- TRUE
-
-# Remove subject(s)
-#reads <- filter(reads, Subject != 6)
 
 # Keep only regions of interest
 reads <- droplevels(filter(reads, Region %in% -1:2))
@@ -75,34 +39,67 @@ reads <- droplevels(filter(reads, Region %in% -1:2))
 # Remove fillers and practice trials
 reads <- droplevels(filter(reads, Item < 100))
 
+# Remove subject(s)
+#reads <- filter(reads, Subject != 6)
+
+# Add log RTs
+reads$logRT <- log(reads$RT)
+
+# Convert variables to numeric / factor:
+reads[ ,c("Subject", "IPhash", "Cond", "Block", "Order", "Plausible", 
+          "Region", "PlausibilityRating")] <-
+  lapply(reads[ ,c("Subject", "IPhash", "Cond", "Block", "Order", "Plausible", 
+                   "Region", "PlausibilityRating")], as.factor)
+
+# Inspect:
+str(reads)
+```
+
+Exclude data. Criteria:
+
+- outlier RTs
+- incorrect plausibility ratings
+- context reading times < 300ms
+
+```{r}
+# Check the original range of the RTs
+range(reads$RT)
+
+# Define thresholds for data exclusion
+min.threshold <- 80
+max.threshold <- 1500
+
+# Check the number of data points concerned by small RTs:
+nrow(filter(reads, RT <= min.threshold))
+# Check the number of data points concerned by large RTs:
+nrow(filter(reads, RT >= max.threshold))
+
+# Data completeness check (for target region)
+xtabs(~ Cond + Subject + Region, filter(reads, Region %in% -1:2))
+
 # Filter RTs to lie within chosen range
 reads <- filterRTs(reads, 
                    c(min.threshold, max.threshold),
                    method = "thresholds", 
-                   remove.incorrect = FALSE, 
-                   remove.contexts = FALSE)
+                   remove.incorrect = TRUE, 
+                   remove.contexts = 300)
 
-# Data completeness check (for target region)
-xtabs(~ Cond + Subject, data = filter(reads, Region == 0))
+# Data completeness check (for target region):
+# minimum and maximum number of datapoints per subject/condition
+min(xtabs(~ Cond + Subject + Region, data = reads))
+max(xtabs(~ Cond + Subject + Region, data = reads))
 
 # Check that RTs are in the specified range 
 range(reads$RT)
 ```
 
-
-
-
-## Sample subsets of participants
-
-### A) Visual inspection
-
-Plotting function: 
+Define a plotting function:
 
 ```{r}
 # Define a line plot function
 line.plot <- function(df) {
   if (log.RTs == TRUE) {
-    y.axis.range <- c(5.45, 5.8)
+    y.axis.range <- c(5.5, 5.85)
   } else {
     y.axis.range <- c(225, 360)
   }
@@ -110,7 +107,8 @@ line.plot <- function(df) {
     ggplot(aes(x = Region, y = MeanRT, color=Cond, group=Cond)) + 
       geom_point(size=2.5, shape="cross") + 
       geom_line(size=0.5) +
-      geom_errorbar(aes(ymin = MeanRT - SE, ymax = MeanRT + SE),  width=0.1, size=0.3) +
+      geom_errorbar(aes(ymin = MeanRT - SE, ymax = MeanRT + SE),
+                    width=0.1, size=0.3) +
       geom_vline(xintercept=0, linetype="dashed") +
       #geom_smooth(method = 'lm', se=TRUE, alpha = .2, aes(fill=Cond)) +
       scale_color_manual("Condition",  # Legend title
@@ -123,80 +121,34 @@ line.plot <- function(df) {
 ```
 
 
-#### Approach 1: sample randomly not maintaining list balance
+## Sampling
 
-Sample N random subjects irrespective of maintaining an equal number of participants per list.
-
-Set up parameters and plotting function:
+Sample an equal number of participants per list (with replacement across, but not within, individual samples).
 
 ```{r fig.height = 10, fig.width = 15}
 # Set random seed (try different values)
 seed <- 42
-# seed <- 1
-set.seed(seed) 
-
-# Set parameters and initialize
-Nsamples <- 10
-Niterations <- 12 
-means.cond.list <- list()
-plot.list <- list()
-
-# Sample
-for (i in 1:Niterations) {
-  participants.sample <- sample(unique(reads$Subject), 10)
-  reads.sample <- filter(reads, Subject %in% participants.sample)
-  
-  means.cond.sample <- aggMeansSE(reads.sample, c("RT", "Cond", "Region"))
-  means.cond.sample$Iteration <- i  # annotate iteration
-  means.cond.list[[i]] <- as.data.frame(means.cond.sample)
-  
-  p.sample <- line.plot(means.cond.sample)
-  plot.list[[i]] <- p.sample
-}
-
-# Save or print plots
-filename <- paste0("Sample_", Nsamples, "subj_", Niterations, "reps_seed", seed, ".pdf")
-pdf(file=filename, width = 15, height = 10)
-grid.arrange(grobs = plot.list, nrow = 3)
-#dev.set(which = 2)  # print plot in plots window
-#dev.copy(which = 4)
-dev.off()
-grid.arrange(grobs = plot.list, nrow = 3,
-             top = textGrob(paste0("Mean RT per condition for ", Nsamples, " randomly sampled subjects"),
-                            gp=gpar(fontsize=20)))
-```
-
-
-#### Approach 2: sample randomly but maintaining list balance
-
-Sample N random subjects but sample an equal number of participants per list (requires Nsamples %% Nlists == 0 to be fully balanced).
-
-```{r fig.height = 10, fig.width = 15}
-# Set random seed (try different values)
-seed <- 42
-# seed <- 1
 set.seed(seed)
 
 # Set parameters and initialize
-Nsamples.per.list <- 2
+Nsamples.per.list <- 3
 Niterations <- 9
 means.cond.list <- list()
 plot.list <- list()
-# Define again whether to use log RTs
-log.RTs = TRUE
+log.RTs = TRUE  # if TRUE, use log RTs, else raw RTs
 
 # Sample
 for (i in 1:Niterations) {
   
-  # Use only subjects of order 1 here;
-  # Subjects 1-5 are list 1, etc. => sample Nsamples from each list:
+  # Randomly sample from each list.
+  # Subjects 1-5 are list 1, order1; subjects 21-25 are list 1, order 2, etc.
   participants.sample <- c(sample(c(1:5, 21:25), Nsamples.per.list),
                            sample(c(6:10, 26:30), Nsamples.per.list),
                            sample(c(11:15, 31:35), Nsamples.per.list),
                            sample(c(16:20, 36:40), Nsamples.per.list))
-  print(participants.sample)
   reads.sample <- filter(reads, Subject %in% participants.sample)
   
+  # Aggregate sampled data 
   if (log.RTs == TRUE) {
     means.cond.sample <-
       aggMeansSE(reads.sample, c("logRT", "Cond", "Region"))
@@ -208,31 +160,37 @@ for (i in 1:Niterations) {
   means.cond.sample$Iteration <- i  # annotate iteration
   means.cond.list[[i]] <- as.data.frame(means.cond.sample)
   
+  # Generate and store plot for current sample 
   p.sample <- line.plot(means.cond.sample)
   plot.list[[i]] <- p.sample
 }
 
 # Save or print plots
-filename <- paste0("./plots/sample_", Nsamples.per.list*4, "subj_", Niterations,
+filename <- paste0("./plots/sample_",
+                   Nsamples.per.list*4,
+                   "subj_", Niterations,
                    "reps_seed", seed, "_balanced_lists", 
-                   ifelse(log.RTs == TRUE, "_log", ""), ".png")
+                   ifelse(log.RTs == TRUE, "_log", ""),
+                   ".png")
 #png(file=filename, width = 1200, height = 800)  # good size for 12 samples
 png(file=filename, width = 900, height = 600)   # good size for 9 samples
-# grid.arrange(grobs = plot.list, nrow = 3)
-grid.arrange(grobs = plot.list, nrow = 3,
+p <- grid.arrange(grobs = plot.list, nrow = 3,
              top = textGrob(paste0("Mean ", 
                                    ifelse(log.RTs == TRUE, "log ", ""),
-                                   " RTs for subsets of ", Nsamples.per.list*4,
-                                   " randomly sampled subjects (", Nsamples.per.list, 
+                                   " RTs for subsets of ",
+                                   Nsamples.per.list*4,
+                                   " randomly sampled subjects (",
+                                   Nsamples.per.list, 
                                    " per list)"),
                             gp=gpar(fontsize=20, fontface=2)))
 dev.off()
+plot(p)
 ```
 
 
-### B) Numeric inspection
+## Numeric inspection 
 
-Calculate standard deviations of the different samples as a measure of variability in the data, using the list-balanced data from above.
+Calculate standard deviations of the different samples as a numeric indicator of the variability in the data.
 
 ```{r}
 # Turn the list of dataframes for each iteration into a single dataframe
