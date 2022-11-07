@@ -24,7 +24,6 @@ SPR1 experiment on PCIbex: https://farm.pcibex.net/experiments/jDVSWb/edit
     - Also exports survey text answers by participants as `Survey_textanswers.csv`.
     - The rest of the script contains several descriptive statistics / plots of the data.
     - At the end, inspects the instruction reading times per participant to see whether any participants skipped the instructions (ignore 0.000 results here; #TODO fix bug).
-  # - `results_SPR_analysis.Rmd`: Reads in the preprocessed results file `results_reads.csv`. Performs descriptive and inferential statistics.
   - `results_SPR_sample.Rmd`: Reads in the preprocessed results file and randomly samples a subset of participants from the data (equally distributed across lists) to (visually) inspect the variation in the data.
   - `results_SPR_rRT.Rmd`: Reads in the preprocessed results file and performs a regression-based RT analysis.
   - `power_simulation.Rmd`: will contain code for a power simulation for this study (in progress).
