@@ -1,0 +1,574 @@
+---
+title: "rRT analysis"
+author: "Miriam Schulz"
+date: "10/11/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, fig.height = 6, fig.width = 9)
+```
+
+
+## About
+
+This script contains an rRT analysis of the inference reading time data (SPR1) based on the rERP approach in Brouwer, Delogu & Crocker (2020). 
+
+
+## Read data and preprocess
+
+Read in the data, scale the predictors, etc.
+
+```{r  include = FALSE}
+# Workspace and libraries
+rm(list = ls())
+library(tidyverse)
+library(lme4)
+library(broom)      # for tidy(modeloutput)
+library(gridExtra)  # for grid.arrange()
+library(grid)       # for textGrob() => change grid.arrange plot name font size 
+library(sciplot)    # for se() 
+library(RColorBrewer)
+source("results_SPR_functions.R") # custom functions
+```
+
+```{r}
+# Read data
+df <- read.csv("results_reads.csv", header = TRUE)
+
+# Exclude filler and practice trials
+df <- filter(df, Item < 100)
+
+# Transform variables to factors
+df$Cond <- as.factor(df$Cond)
+df$Item <- as.factor(as.numeric(as.character(df$Item)))
+df$Subject <- as.factor(as.numeric(as.character(df$Subject)))
+
+# Transform the binary plausibility predictor to numeric, then to factor
+df$Plausible <- as.factor(ifelse(df$Plausible == "Yes", 1, 0))
+
+# Exclude data
+df <- filterRTs(df, criteria = c(50, 2500), method = "thresholds",
+                remove.incorrect = TRUE, remove.contexts = 500)
+
+# Invert predictor scales 
+#df$AssociationRatingInv <- df$AssociationRating - 7
+#df$CoherenceRating <- df$CoherenceRating - 7
+#df$InferenceRating <- df$InferenceRating - 7
+
+# Center and z-score predictors
+df$AssociationRating <- scale(df$AssociationRating)
+df$InferenceRating <- scale(df$InferenceRating)
+df$CoherenceRating <- scale(df$CoherenceRating)
+
+# Extract precritical RT -1 and add to df:
+df.precrit1 <- filter(df, Region == -1) %>% 
+  dplyr::select(Item, Cond, Subject, RT) %>% 
+  rename(RT_precrit1 = RT)
+df <- merge(df, df.precrit1, by = c("Item", "Cond", "Subject"))
+
+# Extract precritical RT -2 and add to df:
+df.precrit2 <- filter(df, Region == -2) %>% 
+  dplyr::select(Item, Cond, Subject, RT) %>% 
+  rename(RT_precrit2 = RT)
+df <- merge(df, df.precrit2, by = c("Item", "Cond", "Subject"))
+
+# Add log-transformed RTs
+df$logRT <- log(df$RT)
+df$logRT_precrit1 <- log(df$RT_precrit1)
+df$logRT_precrit2 <- log(df$RT_precrit2)
+
+# Scale precritical RTs 
+df[, c("RT_precrit1", "RT_precrit2","logRT_precrit1","logRT_precrit2")] <- 
+  lapply(df[, c("RT_precrit1", "RT_precrit2","logRT_precrit1","logRT_precrit2")], scale)
+
+# Rename variables 
+rating_colnames <- str_remove(names(df), "Rating")
+names(df) <- rating_colnames
+
+# Order df by Region
+#df <- arrange(df, Region, Item, Cond)
+df <- arrange(df, Region)
+```
+
+
+## Models 
+
+
+### Define model parameters
+
+Define general model parameters:
+
+- regions to model
+- whether to use raw or log-transformed RTs
+- which kind of model to run:
+  - "lm": simple LM
+  - "lm.by.subj": by-subject LMs
+  - "lmer": LMER
+
+```{r}
+regions <- -1:2
+log.RTs <- TRUE
+m.type = "lm.by.subj"
+
+if (log.RTs == TRUE) {
+  DV <- "logRT"
+  precrit1 <- "logRT_precrit1"
+  precrit2 <- "logRT_precrit2"
+  y.unit <- "Log RT"
+  y.range <- c(5.55, 5.70)
+  y.range.res <- c(-0.07, 0.07)
+} else {
+  DV <- "RT"
+  precrit1 <- "RT_precrit1"
+  precrit2 <- "RT_precrit2"
+  y.unit <- "Raw RT (ms)"
+  y.range <- c(260, 320)
+  y.range.res <- c(-20, 20)
+}
+```
+
+
+### Intercept (baseline) LM model
+
+Following the logic of Brouwer et al. (2020), the analysis starts with a baseline model of the variance in the signal. 
+The baseline model assumes that no factors were manipulated and that all trials belong to the same condition. 
+Therefore, the resulting estimate for each trial in a given region will simply be the average over all trials (and conditions; equivalent to an intercept-only model) in that region. 
+
+Unlike in rERP modeling, different models do not need to be fitted for different electrodes, but like in rERP modeling, different models will be fitted for each subject ($N=40$) and time point (i.e., region, $N=4$: pre-critical region, critical region, post-critical region 1, post-critical region 2), yielding a total of $40 * 4 = 160$ models.
+
+However, here we first start with an even simpler baseline model averaging over subjects.
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1"))
+
+# Run a model for each region
+m.intercept <- runModels(df, m.type, m.formula, regions = regions)
+
+# Generate plots
+p <- generatePlots(m.intercept, "Intercept", m.type,
+                   DV, y.unit, y.range, y.range.res) #, y.range.coefs
+```
+
+
+
+### Models with a single predictor 
+
+
+#### Intercept + binary Plausibility LM
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1 + Plausible"))
+
+# Run a model for each region
+m.intercept.plaus <- runModels(df, m.type, m.formula, regions = regions)
+
+# Generate plots
+p <- generatePlots(m.intercept.plaus, "Intercept+Plausible(binary)", m.type, DV,
+                   y.unit, y.range, y.range.res)
+```
+
+
+
+#### Intercept + Association LM
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1 + Association"))
+
+# Run a model for each region
+m.intercept.assoc <- runModels(df, m.type, m.formula, regions = regions)
+
+# Generate plots
+p <- generatePlots(m.intercept.assoc, "Intercept+Association", m.type, DV,
+                   y.unit, y.range, y.range.res)
+```
+
+
+#### Intercept + Coherence LM
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1 + Coherence"))
+
+# Run a model for each region
+m.intercept.coherence <- runModels(df, m.type, m.formula, regions = regions)
+
+# Generate plots
+p <- generatePlots(m.intercept.coherence, "Intercept+Coherence", m.type, DV,
+                   y.unit, y.range, y.range.res)
+```
+
+
+#### Intercept + Inference LM
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1 + Inference"))
+
+# Run a model for each region
+m.intercept.inference <- runModels(df, m.type, m.formula, regions = regions)
+
+# Generate plots
+p <- generatePlots(m.intercept.inference, "Intercept+Inference", m.type, DV,
+                   y.unit, y.range, y.range.res)
+```
+
+
+#### Intercept + PrecritRT 1 LM
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1 + ", paste0(precrit1)))
+
+# Run a model for each region
+m.intercept.precrit <- runModels(df, m.type, m.formula, regions = regions)
+
+# Generate plots
+p <- generatePlots(m.intercept.precrit, "Intercept+PrecritRT", m.type, DV,
+                   y.unit, y.range, y.range.res)
+```
+
+
+#### Intercept + PrecritRT 2 LM
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1 + ", precrit2))
+
+# Run a model for each region
+m.intercept.precrit2 <- runModels(df, m.type, m.formula, regions = regions)
+
+# Generate plots
+p <- generatePlots(m.intercept.precrit2, "Intercept+PrecritRT2", m.type, DV,
+                   y.unit, y.range, y.range.res)
+```
+
+
+
+### Models with more than 1 predictor
+
+#### Intercept + Association + Coherence 
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence"))
+
+# Run a model for each region
+m.intercept.assoc.coherence <- runModels(df, m.type, m.formula, regions = regions)
+
+# Generate plots
+p <- generatePlots(m.intercept.assoc.coherence, "Intercept+Association+Coherence", m.type, DV,
+                   y.unit, y.range, y.range.res)
+```
+
+
+#### Intercept + Association + Coherence + Precrit_RT1
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence + ", precrit1))
+
+# Run a model for each region
+m.intercept.assoc.coherence.precrit1 <- runModels(df, m.type, m.formula, regions = regions)
+
+# Generate plots
+p <- generatePlots(m.intercept.assoc.coherence.precrit1,
+                   "Intercept+Association+Coherence+Precrit1", m.type, DV,
+                   y.unit, y.range, y.range.res)
+```
+
+
+#### Intercept + Association + Coherence + Precrit_RT2
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence + ", precrit2))
+
+# Run a model for each region
+m.intercept.assoc.coherence.precrit2 <- runModels(df, m.type, m.formula, regions = regions)
+
+# Generate plots
+p <- generatePlots(m.intercept.assoc.coherence.precrit2,
+                   "Intercept+Association+Coherence+Precrit2", m.type, DV,
+                   y.unit, y.range, y.range.res)
+```
+
+
+#### Intercept + Association + Coherence + Precrit_RT1 + Plausible
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence + ", 
+                               precrit1, " + Plausible"))
+
+# Run a model for each region
+m.intercept.assoc.coherence.precrit1.plaus <- runModels(df, m.type, m.formula, regions = regions)
+
+# Generate plots
+p <- generatePlots(m.intercept.assoc.coherence.precrit1.plaus,
+                   "Intercept+Association+Coherence+Precrit1+Plausible(binary)", 
+                   m.type, DV, y.unit, y.range, y.range.res)
+```
+
+
+#### Intercept + Association + Coherence + Precrit_RT1 + Precrit_RT2 + Plausible
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence + Plausible + ",
+                               precrit1, " + ", precrit2))
+
+# Run a model for each region
+m.intercept.assoc.coherence.precrit1.2.plaus <- runModels(df, m.type, m.formula,
+                                                          regions = regions)
+
+# Generate plots
+p <- generatePlots(m.intercept.assoc.coherence.precrit1.2.plaus,
+                   "Intercept+Association+Coherence+Precrit1&2+Plausible(binary)",
+                   m.type, DV, y.unit, y.range, y.range.res)
+```
+
+
+
+### Models with interaction terms
+
+#### Association * Coherence
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ Association * Coherence "))
+
+# Run a model for each region
+m.int.intercept.assoc.coherence <- runModels(df, m.type, m.formula,
+                                             regions = regions)
+
+# Generate plots
+p <- generatePlots(m.int.intercept.assoc.coherence,
+                   "Association*Coherence", m.type, DV,
+                   y.unit, y.range, y.range.res,
+                   coef.plot = TRUE)
+```
+
+#### Association * Coherence * precrit1
+
+```{r, results = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ Association * Coherence * ", precrit1))
+
+# Run a model for each region
+m.int.intercept.assoc.coherence.precrit1 <- runModels(df, m.type, m.formula,
+                                             regions = regions)
+
+# Generate plots
+p <- generatePlots(m.int.intercept.assoc.coherence.precrit1,
+                   "Association*Coherence*RT_precrit1", m.type, DV,
+                   y.unit, y.range, y.range.res,
+                   coef.plot = TRUE)
+```
+
+#### Association * Coherence * precrit2
+
+```{r, results = FALSE, fig.height = 6, fig.width = 9}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ Association * Coherence * ", precrit2))
+
+# Run a model for each region
+m.int.intercept.assoc.coherence.precrit2 <- runModels(df, m.type, m.formula,
+                                             regions = regions)
+
+# Generate plots
+p <- generatePlots(m.int.intercept.assoc.coherence.precrit2,
+                   "Association*Coherence*RT_precrit2", m.type, DV,
+                   y.unit, y.range, y.range.res,
+                   coef.plot = FALSE)
+```
+
+#### Intercept + Association * Coherence * precrit1 * precrit2
+
+```{r, results = FALSE, fig.height = 6, fig.width = 9}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ Association * Coherence * ",
+                               precrit1, " * ", precrit2))
+
+# Run a model for each region
+m.int.intercept.assoc.coherence.precrit1_2 <- runModels(df, m.type, m.formula,
+                                             regions = regions)
+
+# Generate plots
+p <- generatePlots(m.int.intercept.assoc.coherence.precrit1_2,
+                   "Association*Coherence*RT_precrit1_2", m.type, DV,
+                   y.unit, y.range, y.range.res,
+                   coef.plot = FALSE)
+```
+
+
+#### Intercept + Association + Coherence + Association : Coherence + RT_Precrit1
+
+```{r, results = FALSE}
+# Model formula
+#m.type = "lm"
+m.formula <- as.formula(paste0(DV, " ~ Association + Coherence + Association:Coherence + ",
+                               precrit1))
+
+# Run a model for each region
+m.int.intercept.assoc.coherence.precrit1.partial <- runModels(df, m.type, m.formula,
+                                             regions = regions)
+
+# Generate plots
+p <- generatePlots(m.int.intercept.assoc.coherence.precrit1.partial,
+                   "Association+Coherence+Association:Coherence+precrit1", m.type, DV,
+                   y.unit, y.range, y.range.res,
+                   coef.plot = TRUE)
+```
+
+
+
+
+
+### lmer 
+
+```{r, results = FALSE, eval = FALSE}
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1 + Coherence + (1 + Coherence | Item) +
+                               (1 + Coherence | Subject)"))
+m.formula <- as.formula(paste0(DV, " ~ 1 + Coherence + (1 | Item) +
+                               (1 | Subject)"))
+regions <- -1:2
+lmer.1 <- runModels(df, "lmer", m.formula, regions = regions)
+
+
+regions <- 0
+crit <- filter(df, Region %in% regions)
+
+m.lmer <- lmer(RT ~ 1 + Association + Coherence + (1 | Subject) + (1 | Item),
+           data = crit)
+summary(m.lmer)
+
+
+m.lmer <- lmer(RT ~ 1 + Coherence + Association + Plausible + 
+                 (1 + Coherence + Association + Plausible |Subject) +
+                 (1 + Coherence + Association + Plausible | Item),
+           data = crit)
+summary(m.lmer)
+
+m.lmer <- lmer(RT ~ 1 + Plausible + 
+                 (1 + Plausible |Subject) +
+                 (1 + Plausible | Item),
+           data = crit)
+summary(m.lmer)
+
+
+lm(RT ~ 1 + Coherence + Association, data = crit) |> summary()
+
+#TODO add interaction term 
+#TODO: set individual predictors to zero from full model and inspect/plot (plot estimate vs. residual)
+#TODO: check if lmer fixed eff coefs are comparable to lm fixed eff coefs 
+#TODO loop over subjects, individual model per subject, then average 
+
+
+# Model output 
+fixef(m.lmer)  # fixed effects 
+summary(m.lmer)$coefficients
+coef(m.lmer)   # subject/item estimates
+ranef(m.lmer)  # deviation of subject/item from main effect
+
+# Subject estimates with coef() are equal to main effect + ranef():
+est <- ranef(m.lmer)$Subject
+cf <- coef(m.lmer)$Subject
+est$"(Intercept)" + fixef(m.lmer)[[1]] == cf$"(Intercept)"
+
+
+  
+subj.coef <- coef(m.lmer)$Subject
+item.coef <- coef(m.lmer)$Item
+subj.ranef <- ranef(m.lmer)$Subject
+item.ranef <- ranef(m.lmer)$Item
+
+mean(subj.coef$Coherence)
+mean(item.coef$Coherence)
+range(subj.coef$Coherence)
+range(item.coef$Coherence)
+round(mean(subj.ranef$Coherence), 5)
+round(mean(item.ranef$Coherence), 5)
+
+mean(subj.coef[, 1])
+mean(item.coef[, 1])
+range(subj.coef[, 1])
+range(item.coef[, 1])
+round(mean(subj.ranef[, 1]), 5)
+round(mean(item.ranef[, 1]), 5)
+
+coef(summary(m.lmer))
+```
+
+
+
+```{r, results = FALSE, eval = FALSE}
+x <- runModels(df, "lm.by.subj", m.formula, regions = regions)
+x <- runModels(df, "lm", m.formula, regions = regions)
+
+
+x <- arrange(x, Region, Subject)
+
+x.agg <- aggregate(estimate ~ term + Region, 
+                   FUN = mean,
+                   data = x)
+x$estimateRounded <- round(x$estimate, 2)
+
+
+df.crit.subj2 <- dplyr::filter(df, Region == 0, Subject == 2)
+items <- 1:40
+items[!items %in% df.crit.subj2$Item]
+
+m.subj2 <- lm(logRT ~ 1 + Association + Coherence, data = df.crit.subj2)
+m.subj2.tidy <- tidy(m.subj2)
+m.subj1.tidy
+m.subj2.tidy
+
+m.subj1.tidy$Subj <- 1
+m.subj2.tidy$Subj <- 2
+m.subj.12 <- rbind(m.subj1.tidy, m.subj2.tidy)
+class(m.subj.12$estimate)
+
+m.subj.12$term <- ifelse(m.subj.12$term == "(Intercept)", "Intercept", m.subj.12$term)
+
+?dplyr::group_by()
+m.subj.12$term <- as.factor(m.subj.12$term)
+
+aggregate(estimate ~ term,
+          FUN = mean,
+          data = m.subj.12)
+
+aggregate(RT ~ Cond, FUN = mean, data= df.crit.subj2)
+
+output.subj2 <- cbind(data.frame(Residuals = residuals(m.subj2),
+                                FittedValues = fitted.values(m.subj2)))
+      
+for (r in 1:nrow(m.subj1.tidy)) {
+  term <- m.subj1.tidy[r, "term"][[1]]
+  term <- paste("Coef", term, sep = "_")
+  estimate <- m.subj1.tidy[r, "estimate"][[1]]
+  print(term)
+  print(estimate)
+  output.subj[, term] <- estimate
+}
+
+original.subj <- m.subj1$model
+colnames(original.subj) <- paste0("Model_", colnames(original.subj))
+output.subj <- cbind(output.subj, original.subj)
+output <- cbind(df.crit.subj1, output.subj)
+print(summary(output[, as.character(DV)] == output[, paste0("Model_", as.character(DV))]))
+print(summary(round(output$FittedValues + output$Residuals) == round(output[, as.character(DV)])))
+
+output.coefs <- unique()
+
+# Model formula
+m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence"))
+
+# Run a model for each region
+x <- runModelsBySubj(df, "lm", m.formula, regions = regions)
+```
+

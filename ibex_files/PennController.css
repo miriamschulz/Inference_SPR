@@ -1,0 +1,7 @@
+.PennController {
+    width: 40em !important;
+    margin-left: calc(50vw - 20em);
+    font-size: 1.5em;
+    /* left: 50vw !important;
+    transform: translateX(-50%); */
+}

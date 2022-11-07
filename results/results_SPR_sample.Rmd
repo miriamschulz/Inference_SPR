@@ -1,0 +1,242 @@
+---
+title: "Inference SPR results: sampling"
+author: "Miriam Schulz"
+date: "9/15/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## About
+
+This script randomly samples a subset of participants from the results to get an idea of the variation in the data.
+
+
+
+## Preliminaries
+
+Workspace, libraries, functions:
+
+```{r include = FALSE}
+rm(list = ls())  # clear workspace (optional)
+library(tidyverse)
+library(grid)
+library(gridExtra)
+library(sciplot)  # for se function
+source("results_SPR_functions.R") # custom functions 
+```
+
+Read in data:
+
+```{r}
+reads <- read.csv("results_reads.csv", header = TRUE)
+
+#Convert variables to numeric / factor:
+reads[ ,c("Subject", "IPhash", "Cond", "Block", "Order", "Plausible", "Region", "PlausibilityRating")] <-
+  lapply(reads[ ,c("Subject", "IPhash", "Cond", "Block", "Order", "Plausible", "Region", "PlausibilityRating")], as.factor)
+
+# Inspect:
+str(reads)
+
+# Data completeness check (for target region)
+xtabs(~ Cond + Subject, filter(reads, Region == 0))
+
+# Check the range of the RTs
+range(reads$RT)
+```
+
+Exclude data:
+
+```{r}
+# Define thresholds for data exclusion
+min.threshold <- 80
+max.threshold <- 1500
+
+# Check the regions concerned by small RTs:
+filter(reads, RT <= min.threshold)$Region
+# Check the regions concerned by large RTs:
+filter(reads, RT >= max.threshold)$Region
+
+# Add log RTs
+reads$logRT <- log(reads$RT)
+
+# Recide whether to use log RTs 
+log.RTs <- TRUE
+
+# Remove subject(s)
+#reads <- filter(reads, Subject != 6)
+
+# Keep only regions of interest
+reads <- droplevels(filter(reads, Region %in% -1:2))
+
+# Remove fillers and practice trials
+reads <- droplevels(filter(reads, Item < 100))
+
+# Filter RTs to lie within chosen range
+reads <- filterRTs(reads, 
+                   c(min.threshold, max.threshold),
+                   method = "thresholds", 
+                   remove.incorrect = FALSE, 
+                   remove.contexts = FALSE)
+
+# Data completeness check (for target region)
+xtabs(~ Cond + Subject, data = filter(reads, Region == 0))
+
+# Check that RTs are in the specified range 
+range(reads$RT)
+```
+
+
+
+
+## Sample subsets of participants
+
+### A) Visual inspection
+
+Plotting function: 
+
+```{r}
+# Define a line plot function
+line.plot <- function(df) {
+  if (log.RTs == TRUE) {
+    y.axis.range <- c(5.45, 5.8)
+  } else {
+    y.axis.range <- c(225, 360)
+  }
+  p <- df %>%
+    ggplot(aes(x = Region, y = MeanRT, color=Cond, group=Cond)) + 
+      geom_point(size=2.5, shape="cross") + 
+      geom_line(size=0.5) +
+      geom_errorbar(aes(ymin = MeanRT - SE, ymax = MeanRT + SE),  width=0.1, size=0.3) +
+      geom_vline(xintercept=0, linetype="dashed") +
+      #geom_smooth(method = 'lm', se=TRUE, alpha = .2, aes(fill=Cond)) +
+      scale_color_manual("Condition",  # Legend title
+                         values=c("cornflowerblue", "chartreuse3",
+                                  "tomato2", "darkgoldenrod1")) +
+      ylim(y.axis.range) +
+      theme_minimal()
+  p
+}
+```
+
+
+#### Approach 1: sample randomly not maintaining list balance
+
+Sample N random subjects irrespective of maintaining an equal number of participants per list.
+
+Set up parameters and plotting function:
+
+```{r fig.height = 10, fig.width = 15}
+# Set random seed (try different values)
+seed <- 42
+# seed <- 1
+set.seed(seed) 
+
+# Set parameters and initialize
+Nsamples <- 10
+Niterations <- 12 
+means.cond.list <- list()
+plot.list <- list()
+
+# Sample
+for (i in 1:Niterations) {
+  participants.sample <- sample(unique(reads$Subject), 10)
+  reads.sample <- filter(reads, Subject %in% participants.sample)
+  
+  means.cond.sample <- aggMeansSE(reads.sample, c("RT", "Cond", "Region"))
+  means.cond.sample$Iteration <- i  # annotate iteration
+  means.cond.list[[i]] <- as.data.frame(means.cond.sample)
+  
+  p.sample <- line.plot(means.cond.sample)
+  plot.list[[i]] <- p.sample
+}
+
+# Save or print plots
+filename <- paste0("Sample_", Nsamples, "subj_", Niterations, "reps_seed", seed, ".pdf")
+pdf(file=filename, width = 15, height = 10)
+grid.arrange(grobs = plot.list, nrow = 3)
+#dev.set(which = 2)  # print plot in plots window
+#dev.copy(which = 4)
+dev.off()
+grid.arrange(grobs = plot.list, nrow = 3,
+             top = textGrob(paste0("Mean RT per condition for ", Nsamples, " randomly sampled subjects"),
+                            gp=gpar(fontsize=20)))
+```
+
+
+#### Approach 2: sample randomly but maintaining list balance
+
+Sample N random subjects but sample an equal number of participants per list (requires Nsamples %% Nlists == 0 to be fully balanced).
+
+```{r fig.height = 10, fig.width = 15}
+# Set random seed (try different values)
+seed <- 42
+# seed <- 1
+set.seed(seed)
+
+# Set parameters and initialize
+Nsamples.per.list <- 2
+Niterations <- 9
+means.cond.list <- list()
+plot.list <- list()
+# Define again whether to use log RTs
+log.RTs = TRUE
+
+# Sample
+for (i in 1:Niterations) {
+  
+  # Use only subjects of order 1 here;
+  # Subjects 1-5 are list 1, etc. => sample Nsamples from each list:
+  participants.sample <- c(sample(c(1:5, 21:25), Nsamples.per.list),
+                           sample(c(6:10, 26:30), Nsamples.per.list),
+                           sample(c(11:15, 31:35), Nsamples.per.list),
+                           sample(c(16:20, 36:40), Nsamples.per.list))
+  print(participants.sample)
+  reads.sample <- filter(reads, Subject %in% participants.sample)
+  
+  if (log.RTs == TRUE) {
+    means.cond.sample <-
+      aggMeansSE(reads.sample, c("logRT", "Cond", "Region"))
+    colnames(means.cond.sample) <- c("Cond", "Region", "MeanRT", "SE")
+  } else {
+    means.cond.sample <-
+      aggMeansSE(reads.sample, c("RT", "Cond", "Region"))
+  }
+  means.cond.sample$Iteration <- i  # annotate iteration
+  means.cond.list[[i]] <- as.data.frame(means.cond.sample)
+  
+  p.sample <- line.plot(means.cond.sample)
+  plot.list[[i]] <- p.sample
+}
+
+# Save or print plots
+filename <- paste0("./plots/sample_", Nsamples.per.list*4, "subj_", Niterations,
+                   "reps_seed", seed, "_balanced_lists", 
+                   ifelse(log.RTs == TRUE, "_log", ""), ".png")
+#png(file=filename, width = 1200, height = 800)  # good size for 12 samples
+png(file=filename, width = 900, height = 600)   # good size for 9 samples
+# grid.arrange(grobs = plot.list, nrow = 3)
+grid.arrange(grobs = plot.list, nrow = 3,
+             top = textGrob(paste0("Mean ", 
+                                   ifelse(log.RTs == TRUE, "log ", ""),
+                                   " RTs for subsets of ", Nsamples.per.list*4,
+                                   " randomly sampled subjects (", Nsamples.per.list, 
+                                   " per list)"),
+                            gp=gpar(fontsize=20, fontface=2)))
+dev.off()
+```
+
+
+### B) Numeric inspection
+
+Calculate standard deviations of the different samples as a measure of variability in the data, using the list-balanced data from above.
+
+```{r}
+# Turn the list of dataframes for each iteration into a single dataframe
+means.cond.df <- bind_rows(means.cond.list)
+aggMeansSE(means.cond.df, c("MeanRT", "Cond", "Region"))
+```
+

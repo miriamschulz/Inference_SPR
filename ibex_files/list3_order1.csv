@@ -1,0 +1,101 @@
+Item,Cond,Critical,ContextSentence,TargetSentence,Target,Block,Plausible
+113,filler_coherent,5,Die Geschwister meldeten sich nicht zum diesjährigen Schulausflug an.,"Die Schule beschloss, eine Spendenaktion zu organisieren.",Target,Block1,Yes
+116,filler_incoherent,5,Gestern hat die Turnerin den Wettkampf verloren.,"Ihr Partner sagte, dass der Pokal auf dem Regal im Wohnzimmer gut aussehen werde.",Target,Block1,No
+101,filler_coherent,5,Dieses Jahr wurde kein Mitarbeiter des Unternehmens befördert.,"Der Leiter berichtet, dass dem Unternehmen Gelder fehlten.",Target,Block1,Yes
+147,filler_coherent,5,Das Pärchen grub jedes Frühjahr den Garten um.,"Dieses Jahr entdeckten sie, dass der Spaten aus dem Schuppen entwendet worden war.",Target,Block1,Yes
+158,filler_incoherent,5,Wie immer hatte der Onkel am Samstag die Ballettaufführung seiner Nichte verpasst.,"Er schilderte, dass das Ballettstück doch sehr anspruchsvoll gewesen sei.",Target,Block1,No
+12,D,5,Der Friseur hat das Dokument nicht vernichtet.,"Er erfuhr, dass die Asche später zur Beweissicherung sichergestellt wurde.",Asche,Block1,No
+142,filler_coherent,5,Der Gehilfe verrührte die Zutaten stets sehr sorgfältig.,"Seine Vorgesetzte musste ihn ermahnen, den Mixer vorsichtig zu bedienen.",Target,Block1,Yes
+1,C,6,Kein Demonstrant wurde jemals im Zentrum erschossen.,"Die Presse berichtet, dass die Pistole heute am Flussufer gefunden wurde.",Pistole,Block1,No
+114,filler_coherent,5,"Diesen Sommer entschied sich der Abenteurer, nicht zu verreisen.","Er plante, dass die Renovierung seiner Wohnung im August stattfinden könnte.",Target,Block1,Yes
+20,D,5,Die Forscher hatten sich niemals kennengelernt.,"Sie bemerkten, dass das Gespräch weit über zwei Stunden gedauert hatte.",Gespräch,Block1,No
+140,filler_coherent,5,Schließlich hatte die Autorin die Kurzgeschichte geschrieben.,"Sie überlegte, dass eine Shoppingtour eine gute Belohnung sein könnte.",Target,Block1,Yes
+39,A,6,Vor einigen Jahren hat eine Enkelin der Gräfin promoviert.,"Die Universität bestätigt, dass der Doktortitel mit einer besonderen Auszeichnung verliehen wurde.",Doktortitel,Block1,Yes
+130,filler_incoherent,5,Letzte Woche hatte sich der Matrose den Fuß verstaucht.,"Er fand, dass das Tischtennistraining nun noch mehr Spaß machte.",Target,Block1,No
+3,A,6,Letztes Jahr hat der Agent jemanden vergiftet.,"Die Staatsanwaltschaft bestätigt, dass das Gift sehr hoch dosiert war.",Gift,Block1,Yes
+123,filler_incoherent,5,Eine Weile spielte das Kleinkind im Sandkasten.,"Der Vater beobachtete, wie es die Rutsche hinabsauste.",Target,Block1,No
+34,B,6,Dieses Jahr hat die Vermieterin im Haus mehrere Wohnungen bearbeitet.,"Sie sorgte dafür, dass der Pinsel stets mit Vorsicht angesetzt wurde.",Pinsel,Block1,Yes
+133,filler_incoherent,5,Kein Passagier wurde vom Schaffner angesprochen.,"Der Schaffner fand, dass der Ruhestand ihm gut tat.",Target,Block1,No
+36,D,5,Die Schwiegermutter hat nie etwas vorbereitet.,"Sie fand, dass der Teig diesmal besonders gut gelungen war.",Teig,Block1,No
+154,filler_incoherent,5,Heute Morgen war der Pianist aus Griechenland zurückgekehrt.,"Strahlend berichtet er davon, wie schön die Nordlichter gewesen seien.",Target,Block1,No
+10,B,6,Vorgestern ist in der Siedlung ein Auto beschädigt worden.,"Die Gemeinde erfuhr, dass die Bombe in der vorangegangenen Nacht platziert wurde.",Bombe,Block1,Yes
+129,filler_incoherent,5,Am Abend sollte das Schulkind ein Gedicht vortragen.,"Die Großeltern bemerkten, dass der Schwimmunterricht besonders förderlich war.",Target,Block1,No
+29,C,6,Es hat in Bayern nicht gewittert.,"Die Camperin entdeckte, dass der Blitz genau neben ihrem Zelt eingeschlagen hatte.",Blitz,Block1,No
+146,filler_coherent,5,Fröhlich pfeifend verputzte der Maurer die Wand.,"Plötzlich bemerkte er, dass der Spachtel dabei war, in zwei Teile zu brechen.",Target,Block1,Yes
+4,D,6,Keine Insassin der Strafvollzugsanstalt hat sich jemals umgebracht.,"Die Wärterin wusste, dass der Strick von außen hineingeschleust worden war.",Strick,Block1,No
+115,filler_coherent,5,Die Brüder wollten nie ihr Zimmer aufräumen.,"Ihre Eltern fanden, dass das Fernsehverbot angemessen sei.",Target,Block1,Yes
+131,filler_incoherent,5,Der Moderator erhielt nie eine eigene Sendung.,"Es wurde spekuliert, dass seine Karriere dadurch steil nach oben schnellen würde.",Target,Block2,No
+126,filler_incoherent,5,In der Kreisstadt hat es heute früh einen Anschlag gegeben.,"Der lokale Radiosender berichtete, dass die Freibadsaison gerade begonnen hatte.",Target,Block2,No
+136,filler_coherent,5,Gestern hatte der Winzer die Ernte beendet.,"Er freute sich darauf, bald in den Urlaub zu fahren.",Target,Block2,Yes
+160,filler_incoherent,5,Dieses Semester hat der Auszubildende die Abschlussprüfung verschlafen.,"Der Prüfer teilte mit, dass die Note eine glatte Eins sein würde.",Target,Block2,No
+106,filler_coherent,5,In der Kleinstadt hatte sich noch nie ein Attentat ereignet.,"Der Bürgermeister verkündete, dass die Sicherheit im Ort höchste Priorität genoss.",Target,Block2,Yes
+6,B,6,Letztes Wochenende ist ein Bergsteiger in dem Gebirge plötzlich abgestürzt.,"Der Kletterverein verkündete, dass die Beerdigung schon am Samstag stattfand.",Beerdigung,Block2,Yes
+125,filler_incoherent,5,Die Doktorandin hatte am Wochenende die Kinovorstellung verpasst.,"Sie fand, dass das Popcorn sehr lecker gewesen war.",Target,Block2,No
+13,C,6,Das Mädchen hat sich niemals das Bein gebrochen.,"Es stellt fest, dass der Gips ein bisschen zu eng anliegt.",Gips,Block2,No
+139,filler_coherent,5,Die Philosophiestudenten hatten schon viel für die Klausur gelernt.,"Sie dachten, dass eine Abkühlung im Schwimmbad verlockend klang.",Target,Block2,Yes
+26,B,5,Dieses Jahr ist die Künstlerin ihr Bild losgeworden.,"Sie verkündete, dass das Geld für eine neue Staffelei reichte.",Geld,Block2,Yes
+117,filler_incoherent,5,"Die Golfspielerin berichtet, dass sie mit dem Bus zum Sport gefahren war.",Auf dem Rückweg nahm sie das Auto.,Target,Block2,No
+23,A,5,Letztes Jahr wurde der Manager inhaftiert.,"Er erzählte, dass die Zelle wirklich sehr klein war.",Zelle,Block2,Yes
+124,filler_incoherent,5,Neulich hatte die Chemikerin ihr Segelboot verkauft.,"Sie plante, dass die Segelfahrt in den kommenden Ferien über die Ostsee gehen sollte.",Target,Block2,No
+38,B,5,Letztes Wochenende ist die Pilotin zum See gegangen.,"Sie sagte, dass der Köder aus dem Fachgeschäft hervorragend funktioniert hat.",Köder,Block2,Yes
+128,filler_incoherent,5,Als nächstes wollte die Läuferin den Fluss überqueren.,"Der Fußgänger informierte sie, dass der Aufzug leider kaputt sei.",Target,Block2,No
+15,A,5,Gestern wurde der Fischer operiert.,"Er erfuhr, dass das Skalpell äußerst vorsichtig angesetzt worden war.",Skalpell,Block2,Yes
+107,filler_coherent,5,Keine der Schwestern wurde jemals geschlagen.,"Sie erzählten, dass der Erziehungsstil sehr antiautoritär ausgerichtet war.",Target,Block2,Yes
+40,D,7,Die Studentin hat ihre Hausarbeit nicht beendet.,"Sie war erleichtert darüber, dass das Plagiat von den Professoren unbemerkt blieb.",Plagiat,Block2,No
+111,filler_coherent,5,"Die wartenden Fahrgäste wussten nicht, dass der Zug ausgefallen war.",Sie unterhielten sich über Politik und das Wetter.,Target,Block2,Yes
+8,D,5,Der Mann ist niemals in einen Laden eingedrungen.,"Er sagte, dass die Waffe tatsächlich voll geladen gewesen war.",Waffe,Block2,No
+149,filler_coherent,5,Letzten Monat absolvierte die Backpackerin einen Kurs zum Überleben in der Wildnis.,"Stolz zeigte sie, dass ihr Kompass auch über eine Quarzuhr verfügte.",Target,Block2,Yes
+31,A,5,Heute früh haben die Spaziergänger einen Krankenwagen gerufen.,"Sie hörten, dass die Sirene langsam immer lauter wurde.",Sirene,Block2,Yes
+155,filler_incoherent,5,Nach der langen Wartezeit am Check-In Schalter betraten die Urlauber das Flugzeug.,"Sie urteilten, dass der Check-In schnell und effizient gewesen sei.",Target,Block2,No
+11,A,6,Am Wochenende hat die Villa am Stadtrand gebrannt.,"Die Nachbarn merkten, dass das Feuer schnell außer Kontrolle geriet.",Feuer,Block2,Yes
+120,filler_incoherent,5,Der Esotheriker hatte diese Woche seinen Sportkurs geschwänzt.,"Heute klagte er, dass der Muskelkater sehr stark sei.",Target,Block2,No
+144,filler_coherent,5,Die Freunde bereiteten am Nachmittag einen Kuchen vor.,"Sie testeten, dass der Ofen die gewünschte Temperatur erreichte.",Target,Block3,Yes
+151,filler_incoherent,5,Im Herbst hat der Kunstlehrer einen Töpferkurs absolviert.,"Der Schulleiter fand, dass die Weiterbildung den Kunstunterricht verschlechtern würde.",Target,Block3,No
+132,filler_incoherent,5,Der Reiter konnte sich kein eigenes Pferd kaufen.,"Der Reitverein beschloss, dass das Grillfest im Hof stattfinden würde.",Target,Block3,No
+109,filler_coherent,5,Das Patenkind war heute enttäuscht.,"Es beklagte, dass die Patentante nicht zu dem Ausflug erschienen sei.",Target,Block3,Yes
+141,filler_coherent,5,Gerade wollte die Maskenbildnerin mit dem Schminken beginnen.,"Sie entdeckte, dass der Lidschatten fast leer war.",Target,Block3,Yes
+5,C,6,Kein Rentner wurde jemals im Park tot aufgefunden.,"Der Parkwächter berichtet, dass die Leiche später genau untersucht worden war.",Leiche,Block3,No
+148,filler_coherent,5,Der Hausmeister musste jeden Dienstag das Treppenhaus kehren.,"Er beklagte, dass der Besen ein recht altes, ineffizientes Modell sei.",Target,Block3,Yes
+32,D,5,Der Ehemann hat sich niemals Unterstützung gesucht.,"Er bemerkte, dass die Therapie schon bald positive Auswirkungen zeigte.",Therapie,Block3,No
+150,filler_coherent,5,Der Büroangestellte musste täglich die Schriftstücke abheften.,"Genervt erzählt er, dass der Tacker ständig leer sei.",Target,Block3,Yes
+7,A,5,Gestern wurde der Sohn des Händlers verprügelt.,"Er zeigte, dass das Blut inzwischen schon getrocknet war.",Blut,Block3,Yes
+122,filler_incoherent,5,Am Wochenende wollte die Sekretärin erst spät aufwachen.,"Sie versprach, dass der Wecker um 6 Uhr morgens klingeln würde.",Target,Block3,No
+30,B,6,Letzten Monat hat der Dozent seine Freundin angelogen.,"Sie fand heraus, dass die Affäre schon ein paar Wochen dauerte.",Affäre,Block3,Yes
+108,filler_coherent,5,Kein Bürger des Ortes wurde dieses Jahr angegriffen.,"Der lokale Stadtanzeiger schrieb, dass die Kriminalitätsrate im Vergleich zum Vorjahr gesunken sei.",Target,Block3,Yes
+37,C,7,In keinem Reihenhaus auf dem Hügel wurde je eingebrochen.,"Die Mieter teilten mit, dass das Brecheisen später neben der Eingangstür gefunden wurde.",Brecheisen,Block3,No
+112,filler_coherent,5,In der Schrebergartensiedlung kam es niemals zum Streit.,Monatlich wurde eine Gartenparty veranstaltet.,Target,Block3,Yes
+27,A,6,Letzte Woche wurde im Dorf ein Jugendlicher entführt.,"Der Fernsehsender berichtet, dass das Lösegeld sofort von der Familie gezahlt worden war.",Lösegeld,Block3,Yes
+159,filler_incoherent,5,Letztes Wochenende hatte der Magier seine Vorstellung leider abgesagt.,"Der Zirkusdirektor verkündete, dass der Trick mit dem Hasen alle Zuschauer fasziniert habe.",Target,Block3,No
+17,C,6,Kein Politiker wurde jemals im Büro abgehört.,"Der Inspektor berichtet, dass die Wanze unter dem Schreibtisch gefunden wurde.",Wanze,Block3,No
+145,filler_coherent,5,Eine Weile lang blätterte die Spanierin im Lexikon.,"Seufzend stellte sie fest, dass das Wort nur schwer zu übersetzen war.",Target,Block3,Yes
+16,D,5,Der Schüler wurde niemals versorgt.,"Er fand, dass die Spritze doch recht schmerzhaft gewesen war.",Spritze,Block3,No
+153,filler_incoherent,5,"Letztendlich entschied sich die Millionärin, ihr Gold wegzuschließen.","Sie dachte, dass der Tresor gut zum Verwahren ihres Mülls geeignet sei.",Target,Block3,No
+2,B,6,Letzten Monat wurde ein Bettler in der Stadt beseitigt.,"Die Lokalzeitung schrieb, dass das Messer wahrscheinlich aus einem Spezialgeschäft stammte.",Messer,Block3,Yes
+105,filler_coherent,5,Im Sommer jobbte die Auszubildende auf einer Baustelle.,"Sie sagt, dass sie den Bagger leider nicht selbst bedienen durfte.",Target,Block3,Yes
+28,D,6,Die Regionalwahl wurde nicht durchgeführt.,"Der Kandidat schildert, dass der Sieg sehr überraschend für ihn war.",Sieg,Block3,No
+127,filler_incoherent,5,Diesen Winter hatten sich fünf Ehrenamtler für die Suppenküche angemeldet.,"Sie berichteten, dass sie den Winter in Süditalien verbrachten.",Target,Block3,No
+110,filler_coherent,5,Am Freitag wollten die Eltern zu ihrem Wellnesswochenende fahren.,"Die Kinder versicherten, dass sie keine Party veranstalten würden.",Target,Block4,Yes
+138,filler_coherent,5,Der Romanist hatte gerade das Unkraut gejätet.,"Er sagte, dass er den Speicher als nächstes noch entrümpeln wollte.",Target,Block4,Yes
+118,filler_incoherent,5,"Der Schuldner erzählte, dass er gerade Privatinsolvenz angemeldet hatte.",Daraufhin eröffnete er einen neuen Laden.,Target,Block4,No
+152,filler_incoherent,5,"Die Tante entdeckte, dass das Baby endlich eingeschlummert war.","Daraufhin begann sie, die Gute-Nacht-Geschichte mit lauter Stimme vorzulesen.",Target,Block4,No
+103,filler_coherent,5,"Das Ordnungsamt vermerkte, dass die Geschwindigkeitsbeschränkung effektiv war.",Niemand wurde jemals auf der Landstraße geblitzt.,Target,Block4,Yes
+14,B,5,Endlich wurde die Bildhauerin untersucht.,"Sie bestätigt, dass das Röntgengerät nur ein paar Sekunden benötigt hat.",Röntgengerät,Block4,Yes
+134,filler_incoherent,5,"Der Kolumnist hatte es nicht geschafft, den Aufsatz zu beenden.","Er verkündete, dass das Lob des Redakteurs groß sein würde.",Target,Block4,No
+35,A,5,"Eben stellte die Gastwirtin fest, dass die Soße schon schlecht geworden war.","Sie sah, dass der Schimmel schon das ganze Glas bedeckte.",Schimmel,Block4,Yes
+121,filler_incoherent,5,"Die Journalistin gab an, dass sie bald nach Südamerika aufbrechen würde.",Am nächsten Tag verkaufte sie ihre Koffer.,Target,Block4,No
+22,B,7,Endlich wurde der Täter gefunden.,"Der Kommissar sorgte dafür, dass die Handschellen sofort um seine Handgelenke befestigt wurden.",Handschellen,Block4,Yes
+135,filler_incoherent,5,Auf dem Heimweg wurde der Praktikant nicht verfolgt.,"Er wusste, dass sich jemand hinter dem Baum versteckte.",Target,Block4,No
+24,D,5,Der Mechaniker ging niemals in die Berge.,"Er bemerkte, dass die Piste diesmal viel voller war als im Vorjahr.",Piste,Block4,No
+104,filler_coherent,5,"Das Publikum berichtet, dass die Theateraufführung vorgestern gut gelungen sei.",Kein Darsteller hatte den Text vergessen.,Target,Block4,Yes
+21,C,7,Kein Anwalt hat jemals den Zeugen angerufen.,"Der Zeuge stellte fest, dass das Telefonat offensichtlich der Einschüchterung gedient hatte.",Telefonat,Block4,No
+156,filler_incoherent,5,Vor fünf Jahren hatte der alte Jäger mit dem Jagen aufgehört.,"Stolz erzählte er, dass er gestern ein Wildschwein erlegt hatte.",Target,Block4,No
+25,C,5,Der Eisverkäufer machte seiner Kollegin niemals einen Antrag.,"Er erzählt, dass die Hochzeit in einer mittelalterlichen Kapelle stattfand.",Hochzeit,Block4,No
+102,filler_coherent,5,Der Paketzusteller musste nie ermahnt werden.,"Der Geschäftsinhaber erzählt, dass die Waren stets pünktlich geliefert wurden.",Target,Block4,Yes
+18,B,5,Vor kurzem ist die Ehefrau erkrankt.,"Sie sagt, dass das Virus wohl leider anhaltende gesundheitliche Probleme verursacht hat.",Virus,Block4,Yes
+119,filler_incoherent,5,Das Motorrad der Trainerin hatte gestern den Geist aufgegeben.,"Zufrieden berichtet sie, dass sie danach eine Motorradtour gemacht hatte.",Target,Block4,No
+19,A,7,Letzte Woche hatte die Tochter eine Grippe.,"Ihre Mutter vergewisserte sich, dass das Fieber nach ein paar Tagen endlich sank.",Fieber,Block4,Yes
+157,filler_incoherent,5,Häufig ließ der Verwalter den Schlüssel im Türschloss stecken.,"Heute entdeckte er, dass der Schlüssel wieder mal im Blumentopf lag.",Target,Block4,No
+9,C,6,Das Handy des Sängers ist niemals kaputtgegangen.,"Er stellte fest, dass die Reparatur leider ziemlich teuer war.",Reparatur,Block4,No
+137,filler_coherent,5,Vor kurzem hat die Erbin ihren Diamantring verscherbelt.,"Sie verkündete, dass sie als nächstes ein Wohnmobil kaufen wolle.",Target,Block4,Yes
+33,C,6,Keine Schulklasse des Gymnasiums ist jemals mit der Bahn gefahren.,"Der Schulsprecher schildert, dass der Waggon ziemlich voll gewesen war.",Waggon,Block4,No
+143,filler_coherent,5,Oft bereitete der Physiker noch spät nachts den Unterricht vor.,"Er wusste, dass die Skripte sicherlich für die Studierenden schwer zu verstehen waren.",Target,Block4,Yes

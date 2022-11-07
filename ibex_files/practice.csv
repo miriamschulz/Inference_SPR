@@ -1,0 +1,9 @@
+Item,Cond,ContextSentence,TargetSentence,Critical,Target,Plausible,Block
+301,A,Vorhin wurde die Handwerkerin von einer Wespe gestochen.,"Sie sah, dass der Stich langsam anschwoll.",5,Stich,Yes,Practice
+302,C,Kein Trapezkünstler hat bei der Show am Wochenende den Halt verloren.,"Die Zuschauer berichten, dass der Sturz übel endete.",6,Sturz,No,Practice
+303,filler_coherent,"Der Kaufmann wusste, dass er vor kurzem im Halteverbot geparkt hatte.",Diesmal erhielt er keinen Strafzettel und freute sich.,5,Strafzettel,Yes,Practice
+304,B,Gestern ist die Schwimmerin am Strand in eine Muschel getreten.,"Sie sagt, dass sie direkt ein Pflaster benötigte.",7,Pflaster,Yes,Practice
+305,D,Das Kleinkind hatte sich noch nie einer Steckdose genähert.,"Die Eltern erfuhren, dass der Stromschlag wohl Folgeschäden verursachte.",6,Stromschlag,No,Practice
+306,filler_incoherent,Leo und Lina verließen den Strand und gingen schnell nach Hause.,"Daraufhin begannen sie, eine Sandburg zu bauen und spielten im Wasser.",5,Sandburg,No,Practice
+307,filler_incoherent,Letztendlich hat die Teenagerin einen Nebenjob begonnen.,"Fröhlich sagt sie, dass sie nun mehr Freizeit habe.",8,Freizeit,No,Practice
+308,filler_coherent,Die Bankerin hat sich niemals geirrt.,"Ihr Chef wusste, dass sie stets mit größter Sorgfalt arbeitete.",9,Sorgfalt,Yes,Practice
