@@ -19,7 +19,7 @@ This script contains an rRT analysis of the inference reading time data (SPR1) b
 
 Read in the data, scale the predictors, etc.
 
-```{r  include = FALSE}
+```{r include = FALSE}
 # Workspace and libraries
 rm(list = ls())
 library(tidyverse)
@@ -29,8 +29,10 @@ library(gridExtra)  # for grid.arrange()
 library(grid)       # for textGrob() => change grid.arrange plot name font size 
 library(sciplot)    # for se() 
 library(RColorBrewer)
-source("results_SPR_functions.R") # custom functions
+source("results_SPR_functions.R")      # preprocessing and helper functions
+source("results_SPR_functions_rRT.R")  # rRT functions
 ```
+
 
 ```{r}
 # Read data
@@ -56,11 +58,6 @@ df <- filterRTs(df, criteria = c(50, 2500), method = "thresholds",
 #df$CoherenceRating <- df$CoherenceRating - 7
 #df$InferenceRating <- df$InferenceRating - 7
 
-# Center and z-score predictors
-df$AssociationRating <- scale(df$AssociationRating)
-df$InferenceRating <- scale(df$InferenceRating)
-df$CoherenceRating <- scale(df$CoherenceRating)
-
 # Extract precritical RT -1 and add to df:
 df.precrit1 <- filter(df, Region == -1) %>% 
   dplyr::select(Item, Cond, Subject, RT) %>% 
@@ -78,10 +75,6 @@ df$logRT <- log(df$RT)
 df$logRT_precrit1 <- log(df$RT_precrit1)
 df$logRT_precrit2 <- log(df$RT_precrit2)
 
-# Scale precritical RTs 
-df[, c("RT_precrit1", "RT_precrit2","logRT_precrit1","logRT_precrit2")] <- 
-  lapply(df[, c("RT_precrit1", "RT_precrit2","logRT_precrit1","logRT_precrit2")], scale)
-
 # Rename variables 
 rating_colnames <- str_remove(names(df), "Rating")
 names(df) <- rating_colnames
@@ -89,6 +82,14 @@ names(df) <- rating_colnames
 # Order df by Region
 #df <- arrange(df, Region, Item, Cond)
 df <- arrange(df, Region)
+
+# Scale predictors (careful: needs to be performed AFTER removing data)
+df$Association <- scale(df$Association)
+df$Inference <- scale(df$Inference)
+df$Coherence <- scale(df$Coherence)
+df[, c("RT_precrit1", "RT_precrit2","logRT_precrit1","logRT_precrit2")] <- 
+  lapply(df[, c("RT_precrit1", "RT_precrit2","logRT_precrit1","logRT_precrit2")], scale)
+
 ```
 
 

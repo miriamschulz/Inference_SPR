@@ -73,7 +73,7 @@ Mean critical word reading time by condition/region:
 - ...
 
 
-### 4 Time log
+## 4 Time log
 
 - 30.08.2022: Format items for SPR, set up SPR
 - September 2022: Run SPR
