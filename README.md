@@ -1,20 +1,22 @@
-# Self-Paced-Reading study - SPR1
+# Self-Paced-Reading study
 
 
 ## 1. General information
 
 This directory contains the materials and results of the self-paced-reading study for my master's thesis experiment on inference generation.
 
-Factors crossed in the design: Association x Negation (or: Association x Inference).
+Experimental design: 2 x 2 within subjects context manipulation, crossing the factors Event Association x Inference.
 
 8 lists (4 Latin lists in pseudorandomized order; 2 versions of each list, with button order / trial order reversed in the second version of each).
 
-SPR1 experiment on PCIbex: https://farm.pcibex.net/experiments/jDVSWb/edit
+SPR experiment on PCIbex:
+- Demonstration link: https://farm.pcibex.net/r/jDVSWb/
+- Data collection link: https://farm.pcibex.net/p/jjOKBX/
 
 
 ## 2. Files and folders in this directory
 
-- `format_stimuli` folder: contains the R-scripts used to pseudorandomize the lists and put the items into the format required by PC Ibex (`.csv` item tables).
+- `format_stimuli` folder: contains the R-scripts used to prepare the items for PCIbex: pseudorandomize the lists and put the items into the required format (`.csv` item tables).
 - `ibex_files` folder: contains the PCIbex experiment files
 - `results` folder: contains the full downloaded PCIbex results (`results.csv`) and the R-scripts to process the results:
   - `results_SPR_preprocess.Rmd`:
@@ -26,7 +28,6 @@ SPR1 experiment on PCIbex: https://farm.pcibex.net/experiments/jDVSWb/edit
     - At the end, inspects the instruction reading times per participant to see whether any participants skipped the instructions (ignore 0.000 results here; #TODO fix bug).
   - `results_SPR_sample.Rmd`: Reads in the preprocessed results file and randomly samples a subset of participants from the data (equally distributed across lists) to (visually) inspect the variation in the data.
   - `results_SPR_rRT.Rmd`: Reads in the preprocessed results file and performs a regression-based RT analysis.
-  - `power_simulation.Rmd`: will contain code for a power simulation for this study (in progress).
 - `safety_copies` folder: contains downloaded safety copies of the full experiment for each order from PC Ibex.
 
 

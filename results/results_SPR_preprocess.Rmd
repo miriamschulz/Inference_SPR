@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## About this script 
 
-This script reads in the raw results.csv file downloaded from PCIbex.
+This script reads in the raw `results.csv` file downloaded from PCIbex.
 
 It splits the data into four separate data frames:
 
@@ -24,7 +24,9 @@ It splits the data into four separate data frames:
 4. ratings: contains the plausibility ratings, plus the reaction times for the ratings  (manual vs. automatic calculation)
 
 
-## Preliminaries
+## PART 1: PREPROCESSING
+
+### Preliminaries
 
 ```{r include = FALSE}
 # Workspace, libraries, functions
@@ -36,26 +38,26 @@ library(sciplot)  # for se function
 source("results_SPR_functions.R") # custom functions 
 ```
 
-Read in data:
+Read in data and add Subject IDs and ListOrder IDs:
 
 ```{r}
 df <- readPCibex("results.csv")
 
-# Check for / remove duplicate trials
+# Check for duplicate trials
 nrow(df) == nrow(unique(df))
 
-# Optional: remove participants
+# Remove participants
 # Participant with very long RTs who timed out: 
 exclude.participants <- c("42540fa1be6151d9f8ae49bb3098494c")
 df <- filter(df, !IPhash %in% exclude.participants)
 
-
 # Add subject numbers:
 df.subjects <- data.frame(IPhash = unique(df$IPhash), Subject = 1:length(unique(df$IPhash)))
-df <- plyr::join(df.subjects, df)  # use plyr::join instead of merge to preserve original row ordering
+# use plyr::join instead of merge to preserve original row ordering
+df <- plyr::join(df.subjects, df)
 length(unique(df$Subject))
 
-# Manually reconstruct the list and order based on the position of certain items.
+# Reconstruct the list and order based on the position of certain items
 
 # List order:
 # Use item 2 to determine list order.
@@ -64,7 +66,7 @@ df.order.table <- df[df$Item == "2", c("Subject", "Block")]
 df.order.table$Order <- ifelse(df.order.table$Block == "Block3", 1, 2)
 df.order.table$Block <- NULL  # not needed 
 df.order.table <- unique(df.order.table)
-df <- plyr::join(df, df.order.table)  # use plyr::join instead of merge to preserve original row ordering
+df <- plyr::join(df, df.order.table)
 summary(df$Order)
 
 # List number (1-8):
@@ -134,13 +136,13 @@ xtabs(~ Item + List, filter(reads, Region == 0, Item < 100))
 ```
 
 
-## Add Pretest results to df and export 
+### Add Pretest results to df and export 
 
 Read the pretest results from file and add them to the reading time data frame, then export data
 
 
 ```{r}
-items <- read.csv("items_selected_prod+assoc+inference+coherence.csv", header = TRUE)
+items <- read.csv("items_pretests.csv", header = TRUE)
 
 # Add new item numbers:
 items$ItemPretests <- items$Item  # save original item number
@@ -157,23 +159,27 @@ colnames(reads.export)
 reads.export <- reads.export[, c(1, 3, 2, 4:11, 13, 27, 22, 15:19, 23:26)]
 reads.export <- reads.export[ with(reads.export, order(Item, Cond, Region)), ]
 
-write.csv(reads.export, "results_reads.csv", row.names = FALSE)
+write.csv(reads.export, "results_reads2.csv", row.names = FALSE)
 ```
 
 
+## PART 2: PRELIMINARY INSPECTION AND CHECKS
 
-
-## Check for data completeness
+### Check for data completeness
 
 Completeness checks (using the ratings data frame).
 
 (For trial-run results, use 'Time'; for actual results, use 'IPhash' (it can happen that two participants have exactly the same completion time; but the trialruns have the same IPhash, since completed from the same device.))
 
 ```{r}
-xtabs(~ Item + Cond, droplevels(ratings[ratings$Item < 100, ]))       # confirm that each item appeared equal times in all conds
-xtabs(~ Subject + Order, droplevels(ratings[ratings$Item < 100, ]))   # which order each participant saw
-max(xtabs(~ Item + Cond, droplevels(ratings[ratings$Item < 100, ])))  # has to be n of participants/list (10)
-min(xtabs(~ Item + Cond, droplevels(ratings[ratings$Item < 100, ])))  # has to be n of participants/list (10)
+# Confirm that each item appeared equal times in all conds:
+xtabs(~ Item + Cond, droplevels(ratings[ratings$Item < 100, ]))
+# Check which order each participant saw:
+xtabs(~ Subject + Order, droplevels(ratings[ratings$Item < 100, ]))
+# Check that max item/cond entry is equal to N of participants/list = 10:
+max(xtabs(~ Item + Cond, droplevels(ratings[ratings$Item < 100, ])))
+# Check that min item/cond entry is equal to N of participants/list = 10:
+min(xtabs(~ Item + Cond, droplevels(ratings[ratings$Item < 100, ])))
 ```
 
 ```{r results = "hide"}
@@ -185,7 +191,7 @@ xtabs(~ Block + Subject, ratings)      # confirm that each item appeared equal t
 
 
 
-## Inspect survey data
+### Inspect survey data
 
 1) Demographics 
 
@@ -235,8 +241,7 @@ summary(as.factor(filter(survey, Question == "KeepData")$Answer))
 
 
 
-
-## Task accuracy
+### Task accuracy
 
 **NOTE**: the following code only displays accurate results when each list contains the same number of subjects, so extra participants need to be removed beforehand.
 
@@ -370,7 +375,6 @@ item.cond.accs
 # Print any items that had accuracy < 70% for any condition:
 item.cond.accs %>% filter_all(any_vars(. < 0.7))
 ```
-
 
 
 
@@ -564,9 +568,7 @@ means.subj %>%  ggplot(aes(x = reorder(Subject, -RT), y = RT)) +
 
 #### Line plots by Item: 
 
-(code chunk skipped, see Rmd script)
-
-```{r echo = FALSE, eval = FALSE}
+```{r }
 means.cond.item <- aggregate(RT ~ Cond + Region + Item,
                         data = reads,
                         FUN = mean,   # function to apply

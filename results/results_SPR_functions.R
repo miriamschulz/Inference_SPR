@@ -227,24 +227,40 @@ aggMeansSE <- function(df, var.list) {
 
 # Function to remove outliers from RTs based on threshold values or SDs:
 filterRTs <- function(df, criteria, method = "thresholds", 
-                      remove.incorrect = FALSE, remove.contexts = 0) {
+                      remove.incorrect = FALSE, remove.contexts = 0,
+                      regions = -1:2) {
+  
+  df <- filter(df, Region %in% regions)
 
   Nrows.original <- nrow(df)  # store how large the df was originally 
   
   if (method == "thresholds") {
     min.threshold <- criteria[1]
     max.threshold <- criteria[2]
-    df <- filter(df,
-                 #Region == eval(parse(text = region)), 
-                 #Region == region, 
-                 RT > min.threshold,
-                 RT < max.threshold)
+    # Mark trials to exclude
+    df$ExcludeTrial <- ifelse((df$RT < min.threshold |  df$RT > max.threshold),
+                              "yes", "no")
+    df <- filter(df, ExcludeTrial == "no")
+    df$ExcludeTrial <- NULL
+    
+    #df <- filter(df,
+    #             #Region == eval(parse(text = region)), 
+    #             #Region == region, 
+    #             RT > min.threshold,
+    #             RT < max.threshold)
+    
   } else if (method == "sd") {
     #TODO: do the following BY SUBJECT, not by grand mean of RTs
     sd.multiplicator <- criteria
     sd.interval <- sd(df$RT) * sd.multiplicator
-    df <- filter(df,
-                 RT >= mean(RT) - sd.interval & RT <= mean(RT) + sd.interval)
+    dfExcludeTrial <- ifelse((RT < mean(RT) - sd.interval) | 
+                               (RT > mean(RT) + sd.interval), 
+                             "yes", "no")
+    df <- filter(df, ExcludeTrial == "no")
+    df$ExcludeTrial <- NULL
+    
+    #df <- filter(df,
+    #             RT >= mean(RT) - sd.interval & RT <= mean(RT) + sd.interval)
   } else {
     print("Please choose a valid method for filtering: 'threshold', '2sd' or '3sd'.")
   }

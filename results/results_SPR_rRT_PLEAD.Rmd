@@ -1,5 +1,5 @@
 ---
-title: "rRT analysis"
+title: "rRT analysis - plots for PLEAD 16-12-2022"
 author: "Miriam Schulz"
 date: "10/11/2022"
 output: html_document
@@ -444,6 +444,12 @@ modelAndPlot(
   df, m.type, regions, DV,
   y.unit, y.range, y.range.res
 )
+
+
+model.output <- runModels(df, m.type, m.formula, regions = regions)
+p <- plotSPR(model.output, DV, "Observed RTs", y.unit, y.range)
+filename <- paste0("./plots/", DV, "_", "Observed_only", ".png")
+ggsave(filename, plot = p, width = 5, height = 4)
 ```
 
 
@@ -680,42 +686,34 @@ plotSPR(m, "InterceptPrecrit1", "Estimates: Intercept+Precrit1", y.unit, y.range
 
 # Add everything except association 
 m$InterceptCoherencePrecrit1Interaction <- m$`Coef_(Intercept)` + m$Association*0 + m$Coherence*m$Coef_Coherence + m$logRT_precrit1*m$Coef_logRT_precrit1 + m$Association*m$Coherence*m$`Coef_Association:Coherence`
-p1 <- plotSPR(m, "InterceptCoherencePrecrit1Interaction", "Estimates: Full model w/o Association",
+p1 <- plotSPR(m, "InterceptCoherencePrecrit1Interaction", "Estimates: Full model without Association",
         y.unit, y.range)
 
 # Add everything except coherence 
 m$InterceptAssocPrecrit1Interaction <- m$`Coef_(Intercept)` + m$Association*m$Coef_Association + m$Coherence*0 + m$logRT_precrit1*m$Coef_logRT_precrit1 + m$Association*m$Coherence*m$`Coef_Association:Coherence`
-p2 <- plotSPR(m, "InterceptAssocPrecrit1Interaction", "Estimates: Full model w/o Coherence",
+p2 <- plotSPR(m, "InterceptAssocPrecrit1Interaction", "Estimates: Full model without Coherence",
         y.unit, y.range)
 
 # Add everything except precritical 1 
 m$InterceptAssocCoherenceInteraction <- m$`Coef_(Intercept)` + m$Association*m$Coef_Association + m$Coherence*m$Coef_Coherence + m$logRT_precrit1*0 + m$Association*m$Coherence*m$`Coef_Association:Coherence`
-p3 <- plotSPR(m, "InterceptAssocCoherenceInteraction", "Estimates: Full model w/o Precrit1",
+p3 <- plotSPR(m, "InterceptAssocCoherenceInteraction", "Estimates: Full model without Precrit1",
         y.unit, y.range)
 
 
 # Add everything except the interaction term 
 m$InterceptAssocCoherencePrecrit1 <- m$`Coef_(Intercept)` + m$Association*m$Coef_Association + m$Coherence*m$Coef_Coherence + m$logRT_precrit1*m$Coef_logRT_precrit1 + m$Association*m$Coherence*0
-p4 <- plotSPR(m, "InterceptAssocCoherencePrecrit1", "Estimates: Full model w/o interaction",
+p4 <- plotSPR(m, "InterceptAssocCoherencePrecrit1", "Estimates: Full model without the interaction term",
         y.unit, y.range)
 
 # Sanity check: full model 
 m$Full <- m$`Coef_(Intercept)` + m$Association*m$Coef_Association  + m$Coherence*m$Coef_Coherence + m$logRT_precrit1*m$Coef_logRT_precrit1 +  m$Association*m$Coherence*m$`Coef_Association:Coherence`
 p5 <- plotSPR(m, "Full", "Estimates: Full model", y.unit, y.range)
 
-# Add everything except the interaction term 
-m$InterceptOnly <- m$`Coef_(Intercept)`
-p.intercept <- plotSPR(m, "InterceptOnly", "Estimates: Intercept only",
-        y.unit, y.range)  
-
 # Observed data 
 p.observed <- plotSPR(m, DV, "Observed RTs", y.unit, y.range)
 
-p <- grid.arrange(p.intercept,  p2, p4, p1, p3, 
-                p5,
+grid.arrange(p1, p2, p3, 
+             p4, p5, p.observed,
              nrow=2,
              top = textGrob("Setting individual predictors to zero", gp=gpar(fontsize=14, fontface=2)))
-filename <- paste0("./plots/", DV, "_", "Zero_plots", ".png")
-ggsave(filename, plot = p, width = 12, height = 8)
-
 ```
