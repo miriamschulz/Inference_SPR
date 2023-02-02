@@ -3,7 +3,7 @@
 ### 15 September 2022
 
 
-# Define function to round the aggregate mean results to two decimal points: 
+# Define function to round the aggregate mean results to two decimal points
 meanRound <- function(x) {round(mean(x), digits = 2)}
 
 
@@ -129,31 +129,6 @@ getRatings <- function(df) {
   # Remove filler and practice trials if necessary
   #df <- droplevels(df[df$Item < 100, ])
   
-  df
-}
-
-
-# Define a function to extract the reading time data of the context sentences
-getContextReads <- function(df) {
-  #df <- df[df$PennElementName %in% c("showContext", "removeContext"), c(1:2, 6, 9, 12, 14:19)]
-  df <- df[df$PennElementName %in% c("showContext", "removeContext"), ]
-  
-  # Calculate context reading times by subtraction: EndDisplayTime - StartDisplayTime
-  df$EventTime <- as.numeric(df$EventTime)
-  df <- df[ with(df, order(EventTime)), ]  # to prevent errors 
-  start.time <- df[df$PennElementName == "showContext", ]$EventTime
-  end.time <- df[df$PennElementName == "removeContext", ]$EventTime
-  ContextRTs <- end.time - start.time
-  df$ContextRTManual <- rep(ContextRTs, each = 2)
-  
-  df$Item <- as.numeric(df$Item)
-  df[ ,c("Subject", "IPhash", "Cond", "Plausible", "Block")] <-
-    lapply(df[ ,c("Subject", "IPhash", "Cond", "Plausible", "Block")], as.factor)
-
-  df <- df[df$PennElementName == "removeContext", c(2,1, 14:20, 26, 21, 27)]  # remove duplicate rows
-  
-  #df <- droplevels(df[df$Item < 100, ])
-  df <- arrange(df, Item, Cond)
   df
 }
 
