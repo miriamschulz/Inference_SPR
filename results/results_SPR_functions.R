@@ -1,4 +1,4 @@
-### Functions to read in + analyze raw SPR results from PCIbex
+### Helper functions to read in + analyze raw SPR results from PCIbex
 ### Miriam Schulz
 ### 15 September 2022
 
@@ -36,8 +36,14 @@ getSurvey <- function(df) {
 
 
 # Define a function to extract the reading time data of the target sentence 
-# (NOW ALSO ANNOTATES RATING ACCURACY)
 getReads <- function(df) {
+  
+  # Step 0: list order annotation (1 = original, 2 = reversed):
+  df.order.table <- df[df$Item == "2", c("Subject", "Block")]
+  df.order.table$Order <- ifelse(df.order.table$Block == "Block3", 1, 2)
+  df.order.table$Block <- NULL
+  df.order.table <- unique(df.order.table)
+  df <- plyr::join(df, df.order.table)
   
   # Step 1: get ratings df
   ratings <- df[df$Label != "instructions", ]
@@ -51,15 +57,14 @@ getReads <- function(df) {
   # Step 2: SPR Reading times
   df <- df[df$PennElementName == "DashedSentence", ]
   df$TrialNum <- df$IbexItem-11  # annotate trial position
-  df <- df[, c(2,1, 11:24, 26:27)]
-
+  df <- df[, c(2, 1, 11:24, 26:27)]
   df[ , c("Critical", "WordNum")] <- lapply(df[ ,c("Critical", "WordNum")], 
                                             as.numeric)
   
-  # Annotate critical regions 
-  # encode word position wrt. target word position:
+  # Annotate critical regions: encode word position wrt. target word position
   df$Region <- df$WordNum - df$Critical
   
+  # Transform variables to numeric / factor
   df[ ,c("Item", "RT")] <- lapply(df[ ,c("Item", "RT")], as.numeric)
   df[ ,c("Subject", "IPhash", "Cond", "Plausible", "Block")] <-
     lapply(df[ ,c("Subject", "IPhash", "Cond", "Plausible", "Block")], 
@@ -78,56 +83,16 @@ getReads <- function(df) {
   df$RatingCorrect <- ifelse(df$PlausibleKey == df$PlausibilityRating, 1, 0)
   df$PlausibleKey <- NULL
   
+  # Step 5: Annotate list number  
   df <- arrange(df, Item, Cond)
-  
-  df
-}
-
-
-# Define a function to extract the plausibility ratings + reaction times
-getRatings <- function(df) {
-  
-  # 1. Rating:
-  #df <- df[!(df$Label %in% c("practice", "instructions")), ]
-  df <- df[df$Label != "instructions", ]
-  
-  ratings <- df[df$PennElementName == "Decide",
-                c("Subject", "IPhash", "Item", "Cond", "Word")]
-  names(ratings)[names(ratings) == 'Word'] <- 'PlausibilityRating'
-
-  # 2. Reaction Time 
-  # Calculate reaction times by subtraction: EndDisplayTime - StartDisplayTime
-  df <- df[df$PennElementName %in% c("Respond", "Decide"), ]
-  # To fix error in Acceptability ratings reaction times: 
-  # make sure the data frame is ordered correctly 
-  df$EventTime <- as.numeric(df$EventTime)
-  df <- df[ with(df, order(EventTime)), ]
-  start.time <- df[df$PennElementName == "Respond", ]$EventTime
-  end.time <- df[df$PennElementName == "Decide", ]$EventTime
-
-  DecisionRTs <- end.time - start.time
-  df$DecisionRTManual <- rep(DecisionRTs, each = 2)
-  df <- unique(df[df$PennElementName == "Decide", ])
-  
-  # Merge ratings with reaction times 
-  df <- merge(df, ratings, by=c("Subject", "IPhash", "Item", "Cond"))
-
-  df$Item <- as.numeric(df$Item)
-  df[ ,c("Subject", "IPhash", "Cond", "Plausible", "Block")] <-
-    lapply(df[ ,c("Subject", "IPhash", "Cond", "Plausible", "Block")], as.factor)
-
-  # Annotate plausibility correct 
-  #df$PlausibleKey <- ifelse(df$Plausible == "Yes", "K", "D")  # reverse for the other lists!
-  df$PlausibleKey <- ifelse(df$Order == 1,
-                            ifelse(df$Plausible == "Yes", "K", "D"),
-                            ifelse(df$Plausible == "Yes", "D", "K"))
-  df$RatingCorrect <- ifelse(df$PlausibleKey == df$PlausibilityRating, 1, 0)
-  df$PlausibleKey <- NULL
-  
-  df <- df[, c(1:4, 16:21, 26:29)]
-  df <- arrange(df, Item, Cond)
-  # Remove filler and practice trials if necessary
-  #df <- droplevels(df[df$Item < 100, ])
+  # Use item 3, since it has a different position for each list:
+  df.list.table <- unique(df[df$Item == "3", c("Subject", "TrialNum")])
+  df.lists <- data.frame(TrialNum = c(53, 51, 22, 89,  # Order 1 versions
+                                      68, 70, 99, 32), # Order 2 versions
+                         List = 1:8)
+  df.list.table <- merge(df.list.table, df.lists, by="TrialNum")
+  df.list.table$TrialNum <- NULL  # not needed 
+  df <- plyr::join(df, df.list.table)
   
   df
 }
@@ -197,7 +162,6 @@ aggMeansSE <- function(df, var.list) {
   }
   means.cond
 }
-
 
 
 # Function to remove outliers from RTs based on threshold values or SDs:
