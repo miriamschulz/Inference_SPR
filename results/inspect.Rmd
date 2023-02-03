@@ -1,0 +1,632 @@
+---
+title: "Inference SPR results script: data completeness checks & first inspection"
+author: "Miriam Schulz"
+date: "9/15/2022"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width=6, fig.height=5)
+```
+
+# About
+
+In this script:
+
+- Section 2: completeness checks of the data 
+- Section 3: inspection of the demographics and post-experimental survey data
+- Sections 4+: a **purely descriptive** first inspection of the data (numeric & visual)
+
+
+```{r include = FALSE}
+# Workspace, libraries, functions
+rm(list = ls())       # clear workspace (optional)
+library(tidyverse)
+library(MASS)         # for boxcox function 
+library(sciplot)      # for se function
+library(gridExtra)    # for grid.arrange
+source("functions.R") # custom functions 
+```
+
+Read in data:
+
+```{r}
+df <- read.csv("results_reads.csv")
+survey <- read.csv("results_demographics.csv")
+```
+
+
+# Checks for data completeness
+
+Diverse data completeness checks:
+
+```{r collapse = TRUE}
+# Remove fillers and non-target region for inspection
+df.mini <- droplevels(filter(df,
+                             Item < 100,
+                             Region == 0))
+# Confirm that each item appeared equal times in all conditions:
+xtabs(~ Item + Cond, df.mini)
+# Check which order each participant saw:
+xtabs(~ Subject + Order, df.mini)
+# Check that max item/cond entry is equal to N of participants/list = 10:
+max(xtabs(~ Item + Cond, df.mini))
+# Check that min item/cond entry is equal to N of participants/list = 10:
+min(xtabs(~ Item + Cond, df.mini))
+
+xtabs(~ Subject + Cond, df.mini)       # confirm that each subj saw X items per condition
+xtabs(~ Subject + Item, df.mini)       # confirm that each subj saw each item exactly once
+xtabs(~ Block + Subject, df.mini)      # confirm that each item appeared equal times in all conds
+```
+
+
+
+# Inspect demographics & survey
+
+## Demographics 
+
+```{r collapse=TRUE}
+# Age
+round(mean(as.numeric(survey[survey$Question == "Age", "Answer"])), 2)
+range(as.numeric(survey[survey$Question == "Age", "Answer"]))
+
+# Gender
+summary(as.factor(survey[survey$Question == "gender", "Answer"]))
+
+# Handedness
+summary(as.factor(survey[survey$Question == "handedness", "Answer"]))
+
+# Native language 
+summary(as.factor(tolower(survey[survey$Question == "Native_language", "Answer"])))
+```
+
+
+## Strategy, guesses, and post-experimental questionnaire
+
+Manually inspect the dataframe with text responses to the survey questions:
+
+```{r}
+# Extract strategy, guesses, problems and remarks; export to file for easier inspection
+survey.textanswers <- filter(survey,
+                             Question %in% c("Strategy", "Guesses", "Problems",
+                                             "Remarks", "KeepData"))
+```
+
+## Task length and difficulty ratings
+
+```{r}
+exp.length <- filter(survey, Question == "Experiment_length") %>% 
+  mutate(Answer = as.factor(Answer))
+exp.difficulty <- filter(survey, Question =="Task_difficulty") %>% 
+  mutate(Answer = as.factor(Answer))
+xtabs(~ Answer + Question, data = exp.length)
+xtabs(~ Answer + Question, data = exp.difficulty)
+```
+
+## Should the data be kept? (subjective participant answer) 
+
+```{r}
+summary(as.factor(filter(survey, Question == "KeepData")$Answer))
+```
+
+
+
+# Plausibility ratings
+
+## Numeric inspection
+
+**NOTE**: the following code only displays accurate results when each list contains the same number of subjects, so extra participants need to be removed beforehand.
+
+```{r}
+# Remove non-target region for inspection
+df.mini <- droplevels(filter(df, Region == 0))
+# Define Ns (denominators) for percentage calculation:
+exp.conds <- c("A", "B", "C", "D")
+N.trials <- 100 + 8   # 100 items/fillers + 8 practice trials
+N.obs.per.cond <- 11  # 10 trials per condition + 1 practice each per list
+N.fillers <- 32  # 30 fillers per cond (filler_coherent vs. filler_incoherent) + 2 practice each per list
+N.participants <- length(unique(df.mini$Subject))
+```
+
+
+### Task accuracy by plausibility (binary)
+
+```{r collapse = TRUE}
+plaus.accs <- aggregate(RatingCorrect ~ Plausible,
+                        data = df.mini,
+                        FUN = sum)
+plaus.accs$RatingCorrect <- plaus.accs$RatingCorrect / (N.trials/2*N.participants)
+plaus.accs$RatingCorrect <- round(plaus.accs$RatingCorrect, 2)
+colnames(plaus.accs) <- c("Cond", "MeanAccuracy")
+plaus.accs
+```
+
+
+### Task accuracy by condition
+
+```{r collapse = TRUE}
+cond.accs <- aggregate(RatingCorrect ~ Cond,
+                       data = df.mini,
+                       FUN = sum)
+cond.accs$RatingCorrect <- ifelse(
+  cond.accs$Cond %in% exp.conds,
+  cond.accs$RatingCorrect / (N.obs.per.cond * N.participants),
+  cond.accs$RatingCorrect / (N.fillers * N.participants)
+)
+cond.accs$RatingCorrect <- round(cond.accs$RatingCorrect, 2)
+colnames(cond.accs) <- c("Cond", "MeanAccuracy")
+cond.accs
+range(cond.accs$MeanAccuracy)
+```
+
+
+### Task accuracy by subject
+
+```{r collapse = TRUE}
+subj.accs <- aggregate(RatingCorrect ~ Subject,
+                       data = df.mini,
+                       FUN = sum)
+subj.accs$RatingCorrect <- subj.accs$RatingCorrect / N.trials
+
+# Mean overall accuracy:
+round(mean(subj.accs$RatingCorrect), 2)
+
+subj.accs$RatingCorrect <- round(subj.accs$RatingCorrect, 2)
+colnames(subj.accs) <- c("Subject", "MeanAccuracy")
+
+# All subject accuracies:
+subj.accs
+
+# Min to max subject accuracy:
+range(subj.accs$MeanAccuracy)
+```
+
+
+### Task accuracy by subject + condition
+
+```{r}
+subj.cond.accs <- aggregate(RatingCorrect ~ Subject + Cond,
+                  data = df.mini,
+                  FUN = sum,
+                  na.rm = T)
+subj.cond.accs$RatingCorrect <- ifelse(subj.cond.accs$Cond %in% exp.conds, 
+                                  subj.cond.accs$RatingCorrect / N.obs.per.cond,
+                                  subj.cond.accs$RatingCorrect / N.fillers)
+subj.cond.accs$RatingCorrect <- round(subj.cond.accs$RatingCorrect, 2)
+
+subj.cond.accs <- subj.cond.accs %>% 
+  spread(Cond, RatingCorrect)
+
+subj.cond.accs <- merge(subj.cond.accs, subj.accs)
+subj.cond.accs
+```
+
+
+### Task accuracy by subject + plausibility
+
+Check for subject accuracy by Plausibility (not by condition)
+=> allows to check for a systematic bias for using the left or right button across the study.
+
+```{r}
+subj.plaus.accs <- aggregate(
+  RatingCorrect ~ Subject + Plausible,
+  data = df.mini,
+  FUN = sum,
+  na.rm = T
+)
+
+subj.plaus.accs$RatingCorrect <- subj.plaus.accs$RatingCorrect / (N.trials/2)
+subj.plaus.accs$RatingCorrect <- round(subj.plaus.accs$RatingCorrect, 2)
+
+min(subj.plaus.accs$RatingCorrect)  # minimal accuracy by Subject + Plausibility
+
+subj.plaus.accs <- subj.plaus.accs %>% 
+  spread(Plausible, RatingCorrect)
+
+subj.plaus.accs
+```
+
+
+### Task accuracy by item
+
+Check if some particular items or fillers had low overall accuracy ($< 0.7$)
+
+```{r}
+item.accs <- aggregate(RatingCorrect ~ Item,
+                  data = df.mini,
+                  FUN = sum,
+                  na.rm = T)
+item.accs$RatingCorrect <- item.accs$RatingCorrect / N.participants
+range(item.accs$RatingCorrect)  # check that probabilities lie in range [0,1]
+colnames(item.accs) <- c("Item", "MeanAccuracy")
+item.accs$MeanAccuracy <- round(item.accs$MeanAccuracy, 2)
+range(item.accs$MeanAccuracy)
+# Print problematic items with low overall accuracy:
+filter(item.accs, MeanAccuracy < 0.7)
+# Range of overall accuracy for the experimental items only (no fillers):
+range(filter(item.accs, Item < 100)$MeanAccuracy)
+```
+
+*Note:* Low mean accuracy items (mean accuracy $< 0.7$) are all fillers, no experimental item is concerned.
+
+
+### Task accuracy by item + condition (experimental items only)
+
+```{r}
+item.cond.accs <- aggregate(RatingCorrect ~ Item + Cond,
+                  data = df.mini,
+                  FUN = sum,
+                  na.rm = T)
+item.cond.accs <- filter(item.cond.accs, Item < 100)  # remove fillers + practice 
+item.cond.accs$RatingCorrect <- item.cond.accs$RatingCorrect / (N.participants/4)
+range(item.cond.accs$RatingCorrect)  # check that probabilities lie in range [0,1]
+
+item.cond.accs <- item.cond.accs %>% 
+  spread(Cond, RatingCorrect)
+item.cond.accs <- merge(item.cond.accs, item.accs)
+item.cond.accs
+
+# Print any items that had accuracy < 70% for any individual condition:
+item.cond.accs %>% filter_all(any_vars(. < 0.7))
+```
+
+*Note:* 3 experimental items have low accuracy in one condition 
+
+## Visual inspection
+
+### Rating reaction time histograms and QQ plots 
+
+```{r fig.width=10, fig.height=5}
+# Decision Reaction Times
+ratings <- df.mini
+mean(ratings$Decision)
+range(ratings$DecisionRT)  # check: verify that reaction times are in a plausible range!
+aggregate(DecisionRT ~ Cond, 
+          data = ratings, 
+          FUN = meanRound)
+
+# Histograms
+
+par(mfrow=c(1,2))
+
+# Histogram of RTs:
+hist(ratings$DecisionRT,
+     breaks = 30,
+     col='steelblue',
+     main='Raw rating decision times')
+
+# Histogram of log RTs :
+hist(log(ratings$DecisionRT),
+     breaks = 30,
+     col='steelblue',
+     main='Log-transformed rating decision times')
+
+# QQ plots
+
+# Untransformed RTs
+qqnorm(ratings$DecisionRT,
+       col='steelblue',
+       pch=16,
+       main='QQ plot of raw decision times')
+
+# Log-transformed RTs
+qqnorm(log(ratings$DecisionRT),
+       col='steelblue',
+       pch=16,
+       main='QQ plot of log-transformed decision times')
+
+par(mfrow=c(1,1))  # reset
+```
+
+### Rating reaction times by condition
+
+```{r fig.width=10, fig.height=5}
+# Boxplot: 
+p1 <- ratings %>% ggplot(aes(x = Cond, y = DecisionRT, fill=Cond)) + 
+  #geom_point() + 
+  geom_boxplot() + 
+  ggtitle('Rating reaction times by condition') +
+  theme_minimal() + 
+  theme(legend.position="None")
+
+# Boxplot with outliers excluded:
+p2 <- ratings %>% 
+  filter(DecisionRT > 50, DecisionRT < 5000) %>% 
+  ggplot(aes(x = Cond, y = DecisionRT, fill=Cond)) + 
+  #geom_point() + 
+  geom_boxplot() + 
+  ggtitle('Rating reaction times by condition (50 < RT < 5000)') +
+  theme_minimal() +
+  theme(legend.position="None")
+
+grid.arrange(p1, p2, ncol=2)
+```
+
+### Rating accuracy by condition
+
+```{r fig.width=7, fig.height=4}
+cond.accs <- aggMeansSE(ratings, c("RatingCorrect", "Cond"))
+cond.accs <- cond.accs %>% rename("MeanAccuracy" = "MeanRatingCorrect")
+cond.accs %>% 
+  ggplot(aes(x = Cond, y = MeanAccuracy, fill=Cond)) + 
+  #geom_point() + 
+  geom_bar(stat="identity") + 
+  geom_errorbar(aes(ymin = MeanAccuracy - SE, ymax = MeanAccuracy + SE),
+                width=0.1, linewidth=0.3) +
+  theme_minimal()
+```
+
+
+# Reading times
+
+Prepare data: 
+
+```{r}
+# Remove practice and fillers from reads
+reads <- droplevels(filter(df, Item < 100))
+range(reads$RT)
+```
+
+
+## Reading time histogram and qq plots
+
+Histograms and residual plots (all data, no outliers excluded):
+
+```{r fig.width=10, fig.height=5}
+par(mfrow=c(1,2))
+
+# Histograms
+
+# Histogram of RTs:
+hist(reads$RT,
+     breaks = 50,
+     col='steelblue',
+     main='Raw RTs (entire sentence)')
+
+# Histogram of log RTs :
+hist(log(reads$RT),
+     breaks = 50,
+     col='steelblue',
+     main='Log-transformed RTs (entire sentence)')
+
+# QQ plots
+
+# Untransformed RTs
+qqnorm(reads$RT,
+       col='steelblue',
+       pch=16,
+       main='QQ plot of raw RTs')
+
+# Log-transformed RTs
+qqnorm(log(reads$RT),
+       col='steelblue',
+       pch=16,
+       main='QQ plot of log-transformed RTs')
+
+# Exclude outliers form QQ plots 
+
+# Untransformed RTs
+qqnorm(filter(reads, RT > 50, RT < 2500)$RT,
+       col='steelblue',
+       pch=16,
+       main='QQ plot of raw RTs (extreme outilers excluded)')
+
+# Log-transformed RTs
+qqnorm(log(filter(reads, RT > 50, RT < 2500)$RT),
+       col='steelblue',
+       pch=16,
+       main='QQ plot of log-transformed RTs (extreme outilers excluded)')
+
+# Boxcox plot
+boxcox(reads$RT ~ reads$Cond)
+boxcox(filter(reads, RT > 100 & RT < 1000)$RT ~ filter(reads, RT > 100 & RT < 1000)$Cond)
+
+par(mfrow=c(1,1))  # reset
+```
+
+
+## Numeric inspection
+
+### Full target sentence reading times (ALL words)
+
+```{r}
+means.cond.all <- aggregate(RT ~ Cond,
+                            #data = filter(reads, Region >= 0),
+                            data = reads,
+                            FUN = mean,
+                            # function to apply
+                            na.rm = T)    # ignore NAs
+means.cond.allSE <- aggregate(RT ~ Cond,
+                              #data = filter(reads, Region >= 0),
+                              data = reads,
+                              FUN = se,
+                              # function to apply
+                              na.rm = T)   # ignore NAs
+colnames(means.cond.all) <- c("Cond", "MeanRT")
+colnames(means.cond.allSE) <- c("Cond", "SE")
+(means.cond.all <-
+    merge(means.cond.all, means.cond.allSE, by = c("Cond")))
+#filter(means.cond, Region == 0)
+```
+
+### Critical regions reading times
+
+Exclude data:
+
+```{r}
+# Define thresholds for data exclusion
+min.threshold <- 100
+max.threshold <- 1000
+
+# Check the regions concerned by small RTs:
+filter(reads, RT <= min.threshold)$Region
+# Check the regions concerned by large RTs:
+filter(reads, RT >= max.threshold)$Region
+
+# Filter RTs to lie within chosen range
+#TODO: remove all datapoints from trial where single datapoint removed
+reads <- filterRTs(reads, c(min.threshold, max.threshold), method = "thresholds",
+                   #remove.incorrect = FALSE, remove.contexts = 0)
+                   remove.incorrect = TRUE, remove.contexts = 500,
+                   regions = -100:100)
+
+# Filter RTs to lie within chosen range (SD method: here 2SDs)
+#reads <- filterRTs(reads, 2, method = "sd",
+#                   remove.incorrect = FALSE, remove.contexts = FALSE)
+
+# Annotate the sentence final word with "99"
+targetsent.len <- data.frame(aggregate(WordNum ~ Item,
+          data = reads, 
+          FUN = max))
+colnames(targetsent.len) <- c("Item", "FinalWordPos")
+reads <- merge(reads, targetsent.len)
+reads$Region <- ifelse(reads$WordNum==reads$FinalWordPos, 99, reads$Region)
+
+# Keep only regions of interest 
+reads <- filter(reads, Region %in% c(-2:3, 99))
+
+# Print the aggregated RTs for each region of interest:
+for (region in c(-1:2, 99)) {
+  print(paste0("Mean RTs per condition in Region: ", region))
+  reads.region <- filter(reads, Region == region)
+  #reads.region <- filterRTs(reads.region, min.threshold, max.threshold, method = "thresholds")
+  print(aggregate(RT ~ Cond, data = reads.region, FUN = meanRound))
+}
+```
+
+
+## Visual inspection
+
+### Line plot by condition + region
+
+Critical regions: 
+
+```{r}
+# Prepare data: aggregate by Cond+Region and get SE
+means.cond <- aggMeansSE(reads, c("RT", "Cond", "Region"))
+
+# Line plot: 
+means.cond %>% 
+  ggplot(aes(x = as.factor(Region), y = MeanRT, color=Cond, group=Cond)) + 
+  geom_point(size=2.5, shape="cross") + 
+  geom_line(size=0.5) +
+  geom_errorbar(aes(ymin = MeanRT - SE, ymax = MeanRT + SE),
+                width=0.1, linewidth=0.3) +
+  ggtitle("Mean RT per Region (filtered RTs)") +
+  theme_minimal()
+
+# For further inspection, restrict to critical regions
+reads <- filter(reads, Region %in% -1:2)
+```
+
+### Line plots by subject
+
+```{r fig.width=10, fig.height=8}
+means.cond.subj <- aggMeansSE(reads, c("RT", "Cond", "Region", "Subject"))
+
+# Line plot: 
+means.cond.subj %>% 
+  ggplot(aes(x = Region, y = MeanRT, color=Cond, group=Cond)) + 
+  geom_point(size=2.5, shape="cross") + 
+  geom_line(size=0.5) +
+  geom_errorbar(aes(ymin = MeanRT - SE, ymax = MeanRT + SE),
+                width=0.1, linewidth=0.3) +
+  facet_wrap(~ Subject) + 
+  theme_minimal()
+```
+
+### Line plots by Item
+
+```{r fig.width=10, fig.height=8}
+means.cond.item <- aggMeansSE(reads, c("RT", "Cond", "Region", "Item"))
+
+# Line plot: 
+means.cond.item %>% 
+  ggplot(aes(x = Region, y = MeanRT, color=Cond, group=Cond)) + 
+  geom_point(size=2.5, shape="cross") + 
+  geom_line(size=0.5) +
+  geom_errorbar(aes(ymin = MeanRT - SE, ymax = MeanRT + SE),
+                width=0.1, linewidth=0.3) +
+  facet_wrap(~ Item) + 
+  theme_minimal()
+```
+
+### Average total RT by subject
+
+```{r fig.width=6, fig.height=5}
+# Mean RT by subject
+means.subj <- aggregate(RT ~ Subject, 
+                        data = reads, 
+                        FUN = mean,
+                        na.rm = T)
+
+# Reorder by value
+(means.subj <-  arrange(means.subj, desc(RT)))
+
+# Barplot
+means.subj %>%  ggplot(aes(x = reorder(Subject, -RT), y = RT)) + 
+  geom_bar(stat="identity", fill="steelblue") + 
+  ggtitle("Average RT per subject (50ms < RT < 2500ms)") + 
+  theme_minimal()
+```
+
+### Task effect: RT ~ Trial Number  
+
+Check impact of task effect by subject
+
+(Region is set to precritical here since target words differ in length from trial to trial, while the precritical word is always a determiner.)
+
+```{r fig.width=6, fig.height=5}
+reads %>%
+  filter(Region == -1) %>% 
+  ggplot(aes(x = TrialNum, y = RT, color=Subject, group=Subject)) + 
+  geom_point(size=1.5, shape="cross", alpha = 0.5) + 
+  #geom_line(size=0.5, alpha = 0.5) +
+  geom_smooth(method = 'lm', size = 0.5, se=TRUE, alpha = .2, aes(fill=Subject)) +
+  #geom_smooth(method = 'lm', se=TRUE, alpha = .2) +
+  #geom_smooth(method = 'lm', se=TRUE, alpha = .2, aes(x = TrialNum, y = RT)) +
+  ggtitle("RT by Subject + trialnumber") +
+  theme_minimal()
+```
+
+
+### Context sentence reading times
+
+```{r collapse = TRUE, fig.width=7, fig.height=4}
+contexts <- df.mini
+
+# Check range and mean of context reading times
+range(contexts$ContextRT)
+mean(contexts$ContextRT)
+
+# Check for outliers
+nrow(filter(contexts, ContextRT > 10000))
+nrow(filter(contexts, ContextRT < 750))
+
+# Remove large outliers
+nrow(contexts)
+contexts <- filter(contexts, between(ContextRT, 750, 10000))
+nrow(contexts)
+
+# Mean context RTs by condition 
+context.reads <- aggMeansSE(contexts, c("ContextRT", "Cond"))
+
+# Mean context RT by condition + subject
+contextRTs.by.participant <- aggMeansSE(contexts, c("ContextRT", "Cond", "Subject"))
+range(round(contextRTs.by.participant$MeanContextRT))
+
+# Barplot: 
+context.reads %>%
+  #filter(Cond %in% c("A", "B", "C", "D")) %>% 
+  ggplot(aes(x = Cond, y = MeanContextRT, fill=Cond)) + 
+  geom_bar(stat="identity") + 
+  geom_errorbar(aes(ymin = MeanContextRT-SE, ymax = MeanContextRT+SE),
+                width=0.1, linewidth=0.3) +
+  ggtitle("Mean context reading time by condition") +
+  theme_minimal()
+```
+
+

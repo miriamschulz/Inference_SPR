@@ -38,7 +38,7 @@ Most of the above steps are accomplished by functions stored separately in `resu
 # Workspace, libraries, functions
 rm(list = ls())  # clear workspace (optional)
 library(tidyverse)
-source("results_SPR_functions.R") # custom functions 
+source("functions.R") # custom functions 
 ```
 
 Read in data, remove participants and add Subject IDs:

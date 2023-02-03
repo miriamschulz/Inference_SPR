@@ -99,7 +99,6 @@ getReads <- function(df) {
 
 
 # Aggregate by means and condition including SE 
-
 aggMeansSE <- function(df, var.list) {
   
   if (length(var.list) == 2) {
