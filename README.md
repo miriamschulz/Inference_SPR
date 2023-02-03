@@ -19,15 +19,20 @@ SPR experiment on PCIbex:
 - `format_stimuli` folder: contains the R-scripts used to prepare the items for PCIbex: pseudorandomize the lists and put the items into the required format (`.csv` item tables).
 - `ibex_files` folder: contains the PCIbex experiment files
 - `results` folder: contains the full downloaded PCIbex results (`results.csv`) and the R-scripts to process the results:
-  - `results_SPR_preprocess.Rmd`:
-    - Reads in the raw file from PC Ibex and allows to perform some completeness checks.
-    - Annotates subject and list numbers / button order.
-    - Merges the results with the stimuli file and exports this as `results_reads.csv`.
-    - Also exports survey text answers by participants as `Survey_textanswers.csv`.
-    - The rest of the script contains several descriptive statistics / plots of the data.
-    - At the end, inspects the instruction reading times per participant to see whether any participants skipped the instructions (ignore 0.000 results here; #TODO fix bug).
-  - `results_SPR_sample.Rmd`: Reads in the preprocessed results file and randomly samples a subset of participants from the data (equally distributed across lists) to (visually) inspect the variation in the data.
-  - `results_SPR_rRT.Rmd`: Reads in the preprocessed results file and performs a regression-based RT analysis.
+  - `preprocess.Rmd`:
+    - Reads in the raw file from PCIbex.
+    - Annotates subject and list numbers / button order, trial number, etc.
+    - Removes the subject excluded for timing out + extremely long RTs
+    - Merges the results with the stimuli/pretests file and exports this as `results_reads.csv`.
+    - Also exports demographics and experimental survey answers by participants as `results_survey.csv`.
+  - `inspect.Rmd`:
+    - performs data completeness checks
+    - inspects the demographics and survey data
+    - provides a first, *purely numeric/visual* inspection of the results (plausiblity ratings & reading times)
+  - `results_SPR_sample.Rmd`:
+    - Reads in the preprocessed results file and randomly samples a subset of participants from the data (equally distributed across lists) to (visually) inspect the variation in the data.
+  - `results_SPR_rRT.Rmd`:
+    - Reads in the preprocessed results file and performs a regression-based RT analysis.
 - `safety_copies` folder: contains downloaded safety copies of the full experiment for each order from PC Ibex.
 
 
@@ -35,7 +40,7 @@ SPR experiment on PCIbex:
 
 ### 3.1 Participants and recruitment
 
-- 42 subjects were recruited through Prolific (10 per Latin list; 2 were excluded due to a technical problem and a double submission (timed out)).
+- 42 subjects were recruited through Prolific (10 per Latin list; two were excluded: one due to a technical problem on PCIbex and one due to a double submission (timed out)).
 - Prolific criteria:
     - Location: Germany / Austria
     - Desktop devices only
