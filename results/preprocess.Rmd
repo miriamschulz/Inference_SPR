@@ -1,8 +1,11 @@
 ---
-title: "Inference SPR results script: Preprocessing"
+title: "Inference SPR results: Preprocessing"
 author: "Miriam Schulz"
 date: "9/15/2022"
-output: html_document
+output:
+  html_document:
+    toc: true
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
@@ -11,28 +14,31 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 
-## About
+# About
 
-This R markdown script preprocesses the raw SPR results from PCIbex.
+This R markdown script preprocesses the raw SPR results from PCIbex using custom functions stored in `functions.R`.
 
 Reads in the raw `results.csv` file downloaded from PCIbex and merges it with the items + pretest results.
 
-Returns the processed `results_reads.csv` dataframe.
+Returns two dataframes:
 
-Preprocessing steps: 
+- `results_reads.csv` contains the reading time and reaction time data 
+- `results_survey.csv` contains the demographics and survey data
 
-- exclude participants with low accuracy and/or very long reading times
-  (determined)
+Summary of data preprocessing steps: 
+
+- exclude participant with low accuracy and reading times
+  (pre-determined)
 - add unique subject numbers (1-40)
 - annotate list order, list number and trial number
 - annotate word position with respect to the critical target word 
   (target = 0, precritical = -1, spillover1 = 1, etc)
-- annotate plausibility rating accuracy + reaction times
+- annotate plausibility rating accuracy
+- merge data with the items & pretest result file
+- export data
 
-Most of the above steps are accomplished by functions stored separately in `results_SPR_functions.R`.
 
-
-## Preliminaries
+# Preliminaries
 
 ```{r, include = FALSE}
 # Workspace, libraries, functions
@@ -43,7 +49,7 @@ source("functions.R") # custom functions
 
 Read in data, remove participants and add Subject IDs:
 
-```{r}
+```{r collapse=TRUE}
 # Read in raw data
 df <- readPCibex("results.csv")
 
@@ -65,15 +71,15 @@ The `getReads()` function annotates:
 
 - list order, Latin list number and trial position
 - word position with respect to the critical target word 
-- plausibility ratings: accuracy and reaction time
+- plausibility ratings: annotate response accuracy for each trial
 
-```{r}
+```{r collapse=TRUE}
 reads <- getReads(df)
 survey <- getSurvey(df)
 ```
 
 
-## Add pretest results
+# Add pretest results
 
 Read in the items + pretest results and merge with the reading time data frame:
 
@@ -94,7 +100,7 @@ reads.export <- reads.export[, c(1, 3, 2, 4:11, 13, 27, 22, 15:19, 23:26)]
 reads.export <- reads.export[ with(reads.export, order(Item, Cond, Region)), ]
 ```
 
-## Export 
+# Export 
 
 Two separate files are exported:
 

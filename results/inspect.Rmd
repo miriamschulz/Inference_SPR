@@ -35,7 +35,7 @@ Read in data:
 
 ```{r}
 df <- read.csv("results_reads.csv")
-survey <- read.csv("results_demographics.csv")
+survey <- read.csv("results_survey.csv")
 ```
 
 
@@ -49,17 +49,16 @@ df.mini <- droplevels(filter(df,
                              Item < 100,
                              Region == 0))
 # Confirm that each item appeared equal times in all conditions:
-xtabs(~ Item + Cond, df.mini)
+xtabs(~ Cond + Item, df.mini)
 # Check which order each participant saw:
-xtabs(~ Subject + Order, df.mini)
-# Check that max item/cond entry is equal to N of participants/list = 10:
-max(xtabs(~ Item + Cond, df.mini))
-# Check that min item/cond entry is equal to N of participants/list = 10:
-min(xtabs(~ Item + Cond, df.mini))
+xtabs(~ Order + Subject, df.mini)
+# Check that min/max item/cond entry is equal to N of participants/list = 10:
+range(xtabs(~ Item + Cond, df.mini))
 
-xtabs(~ Subject + Cond, df.mini)       # confirm that each subj saw X items per condition
+xtabs(~  Cond + Subject, df.mini)       # confirm that each subj saw X items per condition
 xtabs(~ Subject + Item, df.mini)       # confirm that each subj saw each item exactly once
 xtabs(~ Block + Subject, df.mini)      # confirm that each item appeared equal times in all conds
+range(xtabs(~ Subject, df.mini))/4
 ```
 
 
@@ -106,7 +105,10 @@ xtabs(~ Answer + Question, data = exp.length)
 xtabs(~ Answer + Question, data = exp.difficulty)
 ```
 
-## Should the data be kept? (subjective participant answer) 
+## Should the data be kept?
+
+On the final screen, participants were asked to indicate truthfully whether they believe that their data should be kept for analysis.
+They were informed that their answer had no impact on receiving payment.
 
 ```{r}
 summary(as.factor(filter(survey, Question == "KeepData")$Answer))
@@ -202,6 +204,8 @@ subj.cond.accs <- subj.cond.accs %>%
 
 subj.cond.accs <- merge(subj.cond.accs, subj.accs)
 subj.cond.accs
+# Range of by-condition accuracies (lowest, highest):
+range(subj.cond.accs[, 2:ncol(subj.cond.accs)])
 ```
 
 
@@ -227,6 +231,7 @@ subj.plaus.accs <- subj.plaus.accs %>%
   spread(Plausible, RatingCorrect)
 
 subj.plaus.accs
+range(subj.plaus.accs[, 2:ncol(subj.plaus.accs)])
 ```
 
 
@@ -234,13 +239,12 @@ subj.plaus.accs
 
 Check if some particular items or fillers had low overall accuracy ($< 0.7$)
 
-```{r}
+```{r collapse=TRUE}
 item.accs <- aggregate(RatingCorrect ~ Item,
                   data = df.mini,
                   FUN = sum,
                   na.rm = T)
 item.accs$RatingCorrect <- item.accs$RatingCorrect / N.participants
-range(item.accs$RatingCorrect)  # check that probabilities lie in range [0,1]
 colnames(item.accs) <- c("Item", "MeanAccuracy")
 item.accs$MeanAccuracy <- round(item.accs$MeanAccuracy, 2)
 range(item.accs$MeanAccuracy)
@@ -273,7 +277,8 @@ item.cond.accs
 item.cond.accs %>% filter_all(any_vars(. < 0.7))
 ```
 
-*Note:* 3 experimental items have low accuracy in one condition 
+*Note:* 3 experimental items have low accuracy in one condition.
+
 
 ## Visual inspection
 
@@ -283,10 +288,11 @@ item.cond.accs %>% filter_all(any_vars(. < 0.7))
 # Decision Reaction Times
 ratings <- df.mini
 mean(ratings$Decision)
-range(ratings$DecisionRT)  # check: verify that reaction times are in a plausible range!
-aggregate(DecisionRT ~ Cond, 
-          data = ratings, 
-          FUN = meanRound)
+range(ratings$DecisionRT)
+
+# Mean and SE of ratings, outliers removed
+aggMeansSE(filter(ratings, DecisionRT >= 150, DecisionRT <= 30000),
+           c("DecisionRT", "Cond"))
 
 # Histograms
 
@@ -366,14 +372,14 @@ Prepare data:
 
 ```{r}
 # Remove practice and fillers from reads
-reads <- droplevels(filter(df, Item < 100))
+reads <- removeFillersPractice(df)
 range(reads$RT)
 ```
 
 
 ## Reading time histogram and qq plots
 
-Histograms and residual plots (all data, no outliers excluded):
+Histograms and residual plots (no outliers excluded):
 
 ```{r fig.width=10, fig.height=5}
 par(mfrow=c(1,2))
@@ -422,7 +428,8 @@ qqnorm(log(filter(reads, RT > 50, RT < 2500)$RT),
 
 # Boxcox plot
 boxcox(reads$RT ~ reads$Cond)
-boxcox(filter(reads, RT > 100 & RT < 1000)$RT ~ filter(reads, RT > 100 & RT < 1000)$Cond)
+boxcox(filter(reads, RT > 50 & RT < 2500)$RT ~ 
+         filter(reads, RT > 50 & RT < 2500)$Cond)
 
 par(mfrow=c(1,1))  # reset
 ```
@@ -433,23 +440,16 @@ par(mfrow=c(1,1))  # reset
 ### Full target sentence reading times (ALL words)
 
 ```{r}
-means.cond.all <- aggregate(RT ~ Cond,
-                            #data = filter(reads, Region >= 0),
-                            data = reads,
-                            FUN = mean,
-                            # function to apply
-                            na.rm = T)    # ignore NAs
-means.cond.allSE <- aggregate(RT ~ Cond,
-                              #data = filter(reads, Region >= 0),
-                              data = reads,
-                              FUN = se,
-                              # function to apply
-                              na.rm = T)   # ignore NAs
-colnames(means.cond.all) <- c("Cond", "MeanRT")
-colnames(means.cond.allSE) <- c("Cond", "SE")
-(means.cond.all <-
-    merge(means.cond.all, means.cond.allSE, by = c("Cond")))
-#filter(means.cond, Region == 0)
+# Define thresholds to remove extreme outliers (per-trial basis here)
+min.threshold <- 50
+max.threshold <- 2500
+reads.full <- removeOutliersSPR(
+  reads,
+  c(min.threshold, max.threshold),
+  entire.trial = FALSE,
+  regions = -100:100
+)
+(means.cond.all <- aggMeansSE(reads.full, c("RT", "Cond")))
 ```
 
 ### Critical regions reading times
@@ -457,25 +457,27 @@ colnames(means.cond.allSE) <- c("Cond", "SE")
 Exclude data:
 
 ```{r}
+# Remove wrong accuracy trials
+reads <- removeIncorrect(reads)
+
 # Define thresholds for data exclusion
-min.threshold <- 100
-max.threshold <- 1000
+min.threshold <- 50
+max.threshold <- 2500
 
 # Check the regions concerned by small RTs:
 filter(reads, RT <= min.threshold)$Region
 # Check the regions concerned by large RTs:
 filter(reads, RT >= max.threshold)$Region
 
-# Filter RTs to lie within chosen range
-#TODO: remove all datapoints from trial where single datapoint removed
-reads <- filterRTs(reads, c(min.threshold, max.threshold), method = "thresholds",
-                   #remove.incorrect = FALSE, remove.contexts = 0)
-                   remove.incorrect = TRUE, remove.contexts = 500,
-                   regions = -100:100)
+# Remove SPR outliers
+reads <- removeOutliersSPR(
+  reads,
+  c(min.threshold, max.threshold),
+  entire.trial = TRUE
+)
 
-# Filter RTs to lie within chosen range (SD method: here 2SDs)
-#reads <- filterRTs(reads, 2, method = "sd",
-#                   remove.incorrect = FALSE, remove.contexts = FALSE)
+# Remove context sentence outliers
+reads <- removeOutliersContext(reads, min.rt = 500, max.rt = 30000)
 
 # Annotate the sentence final word with "99"
 targetsent.len <- data.frame(aggregate(WordNum ~ Item,
@@ -485,14 +487,13 @@ colnames(targetsent.len) <- c("Item", "FinalWordPos")
 reads <- merge(reads, targetsent.len)
 reads$Region <- ifelse(reads$WordNum==reads$FinalWordPos, 99, reads$Region)
 
-# Keep only regions of interest 
-reads <- filter(reads, Region %in% c(-2:3, 99))
+# Keep only regions of interest (where 99 => sentence-final word)
+reads <- removeRegions(reads, keep.regions = c(-2:3, 99))
 
 # Print the aggregated RTs for each region of interest:
 for (region in c(-1:2, 99)) {
   print(paste0("Mean RTs per condition in Region: ", region))
   reads.region <- filter(reads, Region == region)
-  #reads.region <- filterRTs(reads.region, min.threshold, max.threshold, method = "thresholds")
   print(aggregate(RT ~ Cond, data = reads.region, FUN = meanRound))
 }
 ```
@@ -512,14 +513,14 @@ means.cond <- aggMeansSE(reads, c("RT", "Cond", "Region"))
 means.cond %>% 
   ggplot(aes(x = as.factor(Region), y = MeanRT, color=Cond, group=Cond)) + 
   geom_point(size=2.5, shape="cross") + 
-  geom_line(size=0.5) +
+  geom_line(linewidth=0.5) +
   geom_errorbar(aes(ymin = MeanRT - SE, ymax = MeanRT + SE),
                 width=0.1, linewidth=0.3) +
   ggtitle("Mean RT per Region (filtered RTs)") +
   theme_minimal()
 
 # For further inspection, restrict to critical regions
-reads <- filter(reads, Region %in% -1:2)
+reads <- removeRegions(reads, keep.regions = -1:2)
 ```
 
 ### Line plots by subject
@@ -531,7 +532,7 @@ means.cond.subj <- aggMeansSE(reads, c("RT", "Cond", "Region", "Subject"))
 means.cond.subj %>% 
   ggplot(aes(x = Region, y = MeanRT, color=Cond, group=Cond)) + 
   geom_point(size=2.5, shape="cross") + 
-  geom_line(size=0.5) +
+  geom_line(linewidth=0.5) +
   geom_errorbar(aes(ymin = MeanRT - SE, ymax = MeanRT + SE),
                 width=0.1, linewidth=0.3) +
   facet_wrap(~ Subject) + 
@@ -553,6 +554,8 @@ means.cond.item %>%
   facet_wrap(~ Item) + 
   theme_minimal()
 ```
+
+*Note:* Depending on which method is used for data filtering/outlier removal, some items/conditions will not have many observations per data point anymore, resulting in large errorbars.
 
 ### Average total RT by subject
 
@@ -577,11 +580,11 @@ means.subj %>%  ggplot(aes(x = reorder(Subject, -RT), y = RT)) +
 
 Check impact of task effect by subject
 
-(Region is set to precritical here since target words differ in length from trial to trial, while the precritical word is always a determiner.)
+(Region is set to precritical here since target words differ in length from trial to trial, while the precritical word is always a determiner; a single outlier with RT < 1500 is excluded.)
 
 ```{r fig.width=6, fig.height=5}
 reads %>%
-  filter(Region == -1) %>% 
+  filter(Region == -1, RT < 1500) %>% 
   ggplot(aes(x = TrialNum, y = RT, color=Subject, group=Subject)) + 
   geom_point(size=1.5, shape="cross", alpha = 0.5) + 
   #geom_line(size=0.5, alpha = 0.5) +
@@ -602,14 +605,9 @@ contexts <- df.mini
 range(contexts$ContextRT)
 mean(contexts$ContextRT)
 
-# Check for outliers
+# Check for potential remaining outliers
 nrow(filter(contexts, ContextRT > 10000))
 nrow(filter(contexts, ContextRT < 750))
-
-# Remove large outliers
-nrow(contexts)
-contexts <- filter(contexts, between(ContextRT, 750, 10000))
-nrow(contexts)
 
 # Mean context RTs by condition 
 context.reads <- aggMeansSE(contexts, c("ContextRT", "Cond"))

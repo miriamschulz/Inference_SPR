@@ -1,13 +1,135 @@
-### Helper functions to read in + analyze raw SPR results from PCIbex
+### Custom functions to preprocess + filter SPR results from PCIbex
 ### Miriam Schulz
 ### 15 September 2022
 
+### Functions are documented using roxygen2.
+### Includes functions for:
+### - General helper functions
+### - Data preprocessing 
+### - Data filtering:
+###   - removing practice+filler trials
+###   - removing non-critical regions
+###   - removing false plausibility rating trials
+### - Outlier removal based on:
+###   - SPR reading time (threshold values or sd)
+###   - context sentence reading time
 
-# Define function to round the aggregate mean results to two decimal points
+
+
+########################
+### Helper functions ###
+########################
+
+
+#' Calculate mean and round to two digits
+#'
+#' @param x A numeric vector
+#'
+#' @return A number rounded to two decimals
+#' @export
+#'
+#' @examples
+#' meanRound(c(2.222, 9.999))
 meanRound <- function(x) {round(mean(x), digits = 2)}
 
 
-# Define a function to read in the raw PCIbex results.csv file
+#' Aggregate data using the mean and standard error
+#'
+#' @description
+#' Data are aggregated using the mean and se function.
+#' Variables are passed as a character vector, beginning with the dependent
+#' variable and continuing with one to three independent variables.
+#'
+#' @param df A data frame 
+#' @param var.list A character vector of the variables (DV first, then 1-3 IVs)
+#'
+#' @return A data frame of the aggregated means and the SE
+#' @export
+#'
+#' @examples
+#' aggMeansSE(df, c("RT", "Cond", "Region"))
+aggMeansSE <- function(df, var.list) {
+  
+  if (length(var.list) == 2) {
+    
+    y <- parse(text = var.list[1])
+    var1 <- parse(text = var.list[2])
+    means.cond <- aggregate(eval(y) ~ eval(var1),
+                            data = df,
+                            FUN = mean)
+    means.condSE <- aggregate(eval(y) ~ eval(var1),
+                              data = df,
+                              FUN = se)
+    var.list <- var.list[-1]  # remove y
+    colnames(means.cond) <- c(var.list, paste0("Mean", y))
+    colnames(means.condSE) <- c(var.list, "SE")
+    means.cond <- merge(means.cond, means.condSE, by=var.list)
+    
+  } else if (length(var.list) == 3) {
+    
+    y <- parse(text = var.list[1])
+    var1 <- parse(text = var.list[2])
+    var2 <- parse(text = var.list[3])
+    means.cond <- aggregate(eval(y) ~ eval(var1) + eval(var2),
+                            data = df,
+                            FUN = mean)
+    means.condSE <- aggregate(eval(y) ~ eval(var1) + eval(var2),
+                              data = df,
+                              FUN = se)
+    var.list <- var.list[-1]  # remove y
+    colnames(means.cond) <- c(var.list, paste0("Mean", y))
+    colnames(means.condSE) <- c(var.list, "SE")
+    means.cond <- merge(means.cond, means.condSE, by=var.list)
+    
+  } else if (length(var.list) == 4) {
+    
+    y <- parse(text = var.list[1])
+    var1 <- parse(text = var.list[2])
+    var2 <- parse(text = var.list[3])
+    var3 <- parse(text = var.list[4])
+    means.cond <- aggregate(eval(y) ~ eval(var1) + eval(var2) + eval(var3),
+                            data = df,
+                            FUN = mean,   # function to apply
+                            na.rm = T)    # ignore NAs
+    means.condSE <- aggregate(eval(y) ~ eval(var1) + eval(var2) + eval(var3),
+                              data = df,
+                              FUN = se,    # function to apply
+                              na.rm = T)   # ignore NAs
+    var.list <- var.list[-1]  # remove y
+    colnames(means.cond) <- c(var.list, paste0("Mean", y))
+    colnames(means.condSE) <- c(var.list, "SE")
+    means.cond <- merge(means.cond, means.condSE, by=var.list)
+    
+  } else {
+    stop("This function takes as input a dataframe and a list of 2-4 variables, starting with Y, then X.")
+  }
+  means.cond
+}
+
+
+
+#######################
+### Data extraction ###
+#######################
+
+
+#' Read in the raw PCIbex results.csv file
+#'
+#' @description
+#' Reads in raw PCIbex results.csv file and adds column names using a 
+#' manually specified vector.
+#' Note: It is important to specify the maximum number of columns from the 
+#' PCIbex results file (html trials will have a different number of columns 
+#' than SPR trials, etc).
+#' Check the results file to find what the maximum number of columns is.
+#'
+#' @param filename A filename of a PCIbex results csv file
+#'
+#' @return A data frame with the correct column names
+#' @export
+#'
+#' @examples
+#' readPCibex("results.csv")
 readPCibex <- function(filename) {
   df <- read.csv(filename, header=F, comment.char="#", encoding="UTF-8",
                  col.names=c("Time", "IPhash", "IbexController", "IbexItem",
@@ -24,7 +146,15 @@ readPCibex <- function(filename) {
 }
 
 
-# Define a function to extract the survey and demographics data
+#' Extract survey and demographics data
+#'
+#' @param df A data frame containing the output of readPCIbex()
+#'
+#' @return A data frame containing the survey and demographics data
+#' @export
+#'
+#' @examples
+#' getSurvey(df)
 getSurvey <- function(df) {
   df <- df[df$Item == "ExperimentalSurvey", ]
   df <- df[df$PennElementName %in% c("demographics", "postexp_survey",
@@ -35,7 +165,20 @@ getSurvey <- function(df) {
 }
 
 
-# Define a function to extract the reading time data of the target sentence 
+#' Extract reading + reaction time data
+#' 
+#' @description
+#' Annotates the reading time + reaction time data frame with additional info:
+#' sentence position relative to target,
+#' rating accuracy, list order, list+trial number.
+#' 
+#' @param df A data frame containing the output of readPCIbex()
+#' 
+#' @return A data frame
+#' @export
+#'
+#' @examples
+#' getReads(df)
 getReads <- function(df) {
   
   # Step 0: list order annotation (1 = original, 2 = reversed):
@@ -54,7 +197,7 @@ getReads <- function(df) {
   ratings[ ,c("Subject", "IPhash", "Cond")] <-
     lapply(ratings[ ,c("Subject", "IPhash", "Cond")], as.factor)
   
-  # Step 2: SPR Reading times
+  # Step 2: SPR Reading Times
   df <- df[df$PennElementName == "DashedSentence", ]
   df$TrialNum <- df$IbexItem-11  # annotate trial position
   df <- df[, c(2, 1, 11:24, 26:27)]
@@ -98,135 +241,21 @@ getReads <- function(df) {
 }
 
 
-# Aggregate by means and condition including SE 
-aggMeansSE <- function(df, var.list) {
-  
-  if (length(var.list) == 2) {
-    
-    y <- parse(text = var.list[1])
-    var1 <- parse(text = var.list[2])
-    means.cond <- aggregate(eval(y) ~ eval(var1),
-                            data = df,
-                            FUN = mean,   # function to apply
-                            na.rm = T)    # ignore NAs
-    means.condSE <- aggregate(eval(y) ~ eval(var1),
-                              data = df,
-                              FUN = se,    # function to apply
-                              na.rm = T)   # ignore NAs
-    var.list <- var.list[-1]  # remove y
-    colnames(means.cond) <- c(var.list, paste0("Mean", y))
-    colnames(means.condSE) <- c(var.list, "SE")
-    means.cond <- merge(means.cond, means.condSE, by=var.list)
-    
-   } else if (length(var.list) == 3) {
- 
-     y <- parse(text = var.list[1])
-     var1 <- parse(text = var.list[2])
-     var2 <- parse(text = var.list[3])
-     means.cond <- aggregate(eval(y) ~ eval(var1) + eval(var2),
-                             data = df,
-                             FUN = mean,   # function to apply
-                             na.rm = T)    # ignore NAs
-     means.condSE <- aggregate(eval(y) ~ eval(var1) + eval(var2),
-                               data = df,
-                               FUN = se,    # function to apply
-                               na.rm = T)   # ignore NAs
-     var.list <- var.list[-1]  # remove y
-     colnames(means.cond) <- c(var.list, paste0("Mean", y))
-     colnames(means.condSE) <- c(var.list, "SE")
-     means.cond <- merge(means.cond, means.condSE, by=var.list)
-
-     
-   } else if (length(var.list) == 4) {
-     
-     y <- parse(text = var.list[1])
-     var1 <- parse(text = var.list[2])
-     var2 <- parse(text = var.list[3])
-     var3 <- parse(text = var.list[4])
-     means.cond <- aggregate(eval(y) ~ eval(var1) + eval(var2) + eval(var3),
-                             data = df,
-                             FUN = mean,   # function to apply
-                             na.rm = T)    # ignore NAs
-     means.condSE <- aggregate(eval(y) ~ eval(var1) + eval(var2) + eval(var3),
-                               data = df,
-                               FUN = se,    # function to apply
-                               na.rm = T)   # ignore NAs
-     var.list <- var.list[-1]  # remove y
-     colnames(means.cond) <- c(var.list, paste0("Mean", y))
-     colnames(means.condSE) <- c(var.list, "SE")
-     means.cond <- merge(means.cond, means.condSE, by=var.list)
-     
-     } else {
-    stop("This function takes as input a dataframe and a list of 2-4 variables, starting with Y, then X.")
-  }
-  means.cond
-}
-
-
-# Function to remove outliers from RTs based on threshold values or SDs:
-filterRTs <- function(df, criteria, method = "thresholds", 
-                      remove.incorrect = FALSE, remove.contexts = 0,
-                      regions = -1:2) {
-  
-  df <- filter(df, Region %in% regions)
-
-  Nrows.original <- nrow(df)  # store how large the df was originally 
-  
-  if (method == "thresholds") {
-    min.threshold <- criteria[1]
-    max.threshold <- criteria[2]
-    # Mark trials to exclude
-    df$ExcludeTrial <- ifelse((df$RT < min.threshold |  df$RT > max.threshold),
-                              "yes", "no")
-    df <- filter(df, ExcludeTrial == "no")
-    df$ExcludeTrial <- NULL
-    
-    #df <- filter(df,
-    #             #Region == eval(parse(text = region)), 
-    #             #Region == region, 
-    #             RT > min.threshold,
-    #             RT < max.threshold)
-    
-  } else if (method == "sd") {
-    #TODO: do the following BY SUBJECT, not by grand mean of RTs
-    sd.multiplicator <- criteria
-    sd.interval <- sd(df$RT) * sd.multiplicator
-    dfExcludeTrial <- ifelse((RT < mean(RT) - sd.interval) | 
-                               (RT > mean(RT) + sd.interval), 
-                             "yes", "no")
-    df <- filter(df, ExcludeTrial == "no")
-    df$ExcludeTrial <- NULL
-    
-    #df <- filter(df,
-    #             RT >= mean(RT) - sd.interval & RT <= mean(RT) + sd.interval)
-  } else {
-    print("Please choose a valid method for filtering: 'threshold', '2sd' or '3sd'.")
-  }
-  
-  # Remove trials with a too short context sentence reading time:
-  if (remove.contexts > 0) {
-    df <- filter(df, ContextRT >= remove.contexts)
-  }
-  
-  # Remove incorrect trials 
-  if (remove.incorrect == TRUE) {
-    df <- filter(df, RatingCorrect == 1)
-  }
-  
-  Nrows.new <- nrow(df)  # store size of reduced df for comparison
-  
-  # Print how much data was removed 
-  print(paste0("Removing extreme values and incorrectly answered trials affected ",
-               (round(1-(Nrows.new/Nrows.original), 4))*100,
-               "% of the data."))
-  print(paste0("(Original rows in df: ", Nrows.original,
-               ". Remaining rows in df: ", Nrows.new, ".)"))
-  
-  df
-}
-
-
-# Function to get reading time for the html files (in seconds + in minutes)
+#' Print by-subject reading time for the html files
+#'
+#' @description
+#' Prints the time each subject spend reading the html files.
+#' This allows to check how much time was spent reading the instructions. 
+#' Low instruction reading times suggest that the instructions were skipped.
+#'
+#' @param df A dataframe containing the output of readPCIbex()
+#'
+#' @return A dataframe containing the reading time for each html element
+#' in minutes and seconds
+#' @export
+#'
+#' @examples
+#' getHtmlTime(df)
 getHtmlTime <- function(df) {
   
   df <- df[df$Item == 'ExperimentalSurvey', ]
@@ -234,7 +263,7 @@ getHtmlTime <- function(df) {
   
   df$EventTime <- as.numeric(df$EventTime)
   df <- df[ with(df, order(Time, EventTime)), ]
-
+  
   start.time <- df[df$Word == "Start", ]$EventTime
   end.time <- df[df$Word == "End", ]$EventTime
   
@@ -245,5 +274,207 @@ getHtmlTime <- function(df) {
   df$HtmlRTSeconds <- round(df$HtmlRTSeconds, 1)
   
   df <- unique(df[df$Word == "End", c(2, 1, 7, 27:28)])
+  df
+}
+
+
+
+######################
+### Data filtering ###
+######################
+
+
+#' Data filtering: remove fillers and/or practice trials
+#'
+#' @param df A data frame with the reading time data
+#' @param fillers Boolean: if TRUE, remove filler trials
+#' @param practice Boolean: if TRUE, remove practice trials
+#'
+#' @return A data frame with trials removed as specified
+#' @export
+#'
+#' @examples
+#' removeFillersPractice(df, fillers=FALSE, practice=TRUE)
+removeFillersPractice <- function(df,
+                                  fillers=TRUE,
+                                  practice=TRUE) {
+  if (practice==TRUE) {
+    # Practice trials have item numbers 301-308
+    df <- filter(df, Item < 300)
+  }
+  if (fillers==TRUE) {
+    # Filler trials have item numbers 101-160
+    df <- filter(df, Item > 300 | Item < 100)
+  }
+  df <- droplevels(df)
+  df
+}
+
+
+#' Data filtering: remove non-critical regions
+#'
+#' @param df A data frame with reading times
+#' @param keep.regions A numeric vector specifying the regions to keep, e.g.-1:2
+#'
+#' @return A data frame containing only the chosen regions
+#' @export
+#'
+#' @examples
+#' removeRegions(df, keep.regions=-1:2)
+#' removeRegions(df, keep.regions=c(-2:3, 99))
+removeRegions <- function(df,
+                          keep.regions) {
+  df <- droplevels(filter(df, Region %in% keep.regions))
+  df
+}
+
+
+#' Data filtering: remove trials with wrong plausibility rating
+#'
+#' @param df A data frame
+#'
+#' @return A data frame without falsely answered trials
+#' @export
+#'
+#' @examples
+removeIncorrect <- function(df) {
+  nrow.start <- nrow(df)  # store original size of df
+  df <- filter(df, RatingCorrect == 1)
+  nrow.end <- nrow(df)  # store new size of df
+  printDataLoss(nrow.start, nrow.end)
+  df
+}
+
+
+#######################
+### Outlier removal ###
+#######################
+
+
+#' Calculate how much % of data is removed by an outlier removal method
+#'
+#' @param nrow.start An integer: nrow of original data frame
+#' @param nrow.end An integer: nrow of data frame after outlier removal 
+#'
+#' @return
+printDataLoss <- function(nrow.start, nrow.end) {
+  cat(sprintf("\nRemoving outliers values affected %s%% of the data.\n",
+          (round(1-(nrow.end/nrow.start), 4))*100))
+  cat(sprintf("Original N rows: %s, new N rows: %s.\n", nrow.start, nrow.end))
+}
+
+
+#' Outlier removal: SPR word reading times
+#'
+#' @description
+#' Can remove outlier reading time trials using two methods: 
+#' either by specifying hard thresholds for cutoff, e.g. > 50ms and < 2500ms,
+#' or by using a multiple of the standard deviation for each participant.
+#' 
+#' When entire.trial = TRUE, removes all data points of an affected trial,
+#' so the RT of each word in that sentence for that Item-Condition-Subject.
+#' IMPORTANT: entire.trial = TRUE will by default only remove trials for which 
+#' one of the critical region RTs is an outlier (regions -1 to 2: 
+#' precrit to spillover2)!
+#' This is to prevent massive data loss when including all regions.
+#' The regions parameter can be modified to allow entire.trial exclusion 
+#' based on values in other regions as well (include all: regions = -100:100).
+#'
+#' @param df A dataframe containing the reading time data
+#' @param criteria Depending on the chosen method, 
+#' either a numeric vector of length 2 containing the min and max threshold,
+#' or an integer/float specifying the SD for exclusion 
+#' @param entire.trial Boolean
+#' @param regions A numeric vector: regions that serve as basis for entire.trial
+#'
+#' @return A data frame without the outlier trials
+#' @export
+#'
+#' @examples
+#' removeOutliersSPR(df, c(50, 2500), entire.trial=TRUE)
+#' removeOutliersSPR(df, 2, entire.trial=FALSE)
+removeOutliersSPR <- function(df,
+                             criteria,
+                             entire.trial = TRUE,
+                             regions = -1:2) {
+
+  if (length(criteria)==1) {
+    method = "sd"
+  } else {
+    method = "threshold"
+  }
+  
+  nrow.start <- nrow(df)  # store original size of df
+  
+  if (method == "threshold") {
+  
+    # Unpack min and max threshold
+    min.rt <- criteria[1]
+    max.rt <- criteria[2]
+    
+    cat(sprintf("Filtering RTs using method: hard thresholds (%s ms < RT < %s ms)\n",
+            min.rt, max.rt))
+
+    # Mark trials to exclude
+    df$ExcludeTrial <- ifelse((df$RT < min.rt | df$RT > max.rt), "yes", "no")
+    
+    if (entire.trial==TRUE) {
+      df.exclude <- filter(df,
+                           ExcludeTrial == "yes",
+                           Region %in% regions)
+      df$ExcludeTrial <- ifelse(
+        (
+          df$Item %in% df.exclude$Item & df$Cond %in% df.exclude$Cond &
+            df$Subject %in% df.exclude$Subject
+        ),
+        "yes",
+        df$ExcludeTrial  # this will still remove words with original "yes"
+      )
+    }
+    
+    # Remove trials
+    df <- filter(df, ExcludeTrial=="no")
+    df$ExcludeTrial <- NULL
+    
+  } else if (method == "sd") {
+    
+    cat(sprintf("Filtering RTs using method: SD by participant (cutoff value: +- %s SD(s))\n",
+            criteria))
+    
+    #TODO: do the following BY SUBJECT, not by grand mean of RTs
+    sd.value <- criteria
+    sd.interval <- sd(df$RT) * sd.value
+    dfExcludeTrial <- ifelse((RT < mean(RT) - sd.interval) | 
+                               (RT > mean(RT) + sd.interval), 
+                             "yes", "no")
+    df <- filter(df, ExcludeTrial == "no")
+    df$ExcludeTrial <- NULL
+  }
+  
+  nrow.end <- nrow(df)  # store new size of df
+  
+  printDataLoss(nrow.start, nrow.end)
+
+  df
+}
+
+
+#' Outlier removal: context sentence reading times
+#'
+#' @param df A data frame
+#' @param min.rt An integer: minimum allowed context reading time
+#' @param max.rt An integer: maximum allowed context reading time
+#'
+#' @return A data frame without low/high context reading time trials
+#' @export
+#'
+#' @examples
+#' removeOutliersContext(df, min.rt=500, max.rt=30000)
+removeOutliersContext <- function(df, min.rt, max.rt) {
+  nrow.start <- nrow(df)  # store original size of df
+  df <- filter(df, ContextRT <= max.rt,
+               ContextRT >= min.rt)
+  nrow.end <- nrow(df)  # store new size of df
+  printDataLoss(nrow.start, nrow.end)
   df
 }
