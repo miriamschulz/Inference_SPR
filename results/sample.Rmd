@@ -2,95 +2,104 @@
 title: "Inference SPR results: sampling"
 author: "Miriam Schulz"
 date: "9/15/2022"
-output: html_document
+output:
+  html_document:
+    toc: true
+    number_sections: true
+
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, collapse=TRUE)
 ```
 
 
-## About
+# About
 
-This script randomly samples a subset of participants from the results to get an idea of the variation in the data.
+This script randomly samples a subset of participants from the results to provide an idea of the variation in the data.
 
 
-## Preliminaries
+# Preliminaries
 
 ```{r, include = FALSE}
 # Workspace, libraries and functions
-rm(list = ls())  # clear workspace (optional)
+rm(list = ls())        # clear workspace (optional)
 library(tidyverse)
 library(grid)
-library(gridExtra)
-library(sciplot)  # for se function
-source("results_SPR_functions.R") # custom functions 
+library(gridExtra)     # for grid.arrange
+library(sciplot)       # for se function
+source("functions.R")  # custom functions 
 ```
 
 Read in and preprocess data:
 
-```{r, results = FALSE}
+```{r}
 # Read in preprocessed results file:
 reads <- read.csv("results_reads.csv", header = TRUE)
 
-# Keep only regions of interest
-reads <- droplevels(filter(reads, Region %in% -1:2))
-
 # Remove fillers and practice trials
-reads <- droplevels(filter(reads, Item < 100))
+reads <- removeFillersPractice(reads)
 
-# Remove subject(s)
-#reads <- filter(reads, Subject != 6)
+# Keep only regions of interest
+reads <- removeRegions(reads, keep.regions = -1:2)
 
 # Add log RTs
 reads$logRT <- log(reads$RT)
 
 # Convert variables to numeric / factor:
-reads[ ,c("Subject", "IPhash", "Cond", "Block", "Order", "Plausible", 
-          "Region", "PlausibilityRating")] <-
-  lapply(reads[ ,c("Subject", "IPhash", "Cond", "Block", "Order", "Plausible", 
-                   "Region", "PlausibilityRating")], as.factor)
+reads[, c(
+  "Subject",
+  "IPhash",
+  "Cond",
+  "Block",
+  "Order",
+  "Plausible",
+  "Region",
+  "PlausibilityRating"
+)] <-
+  lapply(reads[, c(
+    "Subject",
+    "IPhash",
+    "Cond",
+    "Block",
+    "Order",
+    "Plausible",
+    "Region",
+    "PlausibilityRating"
+  )], as.factor)
 
 # Inspect:
 str(reads)
 ```
 
-Exclude data. Criteria:
+Exclude data.
 
-- outlier RTs
+Criteria:
+
+- outlier SPR reading times
+- outlier context sentence reading times
 - incorrect plausibility ratings
-- context reading times < 300ms
 
 ```{r}
 # Check the original range of the RTs
 range(reads$RT)
 
 # Define thresholds for data exclusion
-min.threshold <- 80
-max.threshold <- 1500
-
-# Check the number of data points concerned by small RTs:
-nrow(filter(reads, RT <= min.threshold))
-# Check the number of data points concerned by large RTs:
-nrow(filter(reads, RT >= max.threshold))
-
-# Data completeness check (for target region)
-xtabs(~ Cond + Subject + Region, filter(reads, Region %in% -1:2))
+min.threshold <- 50
+max.threshold <- 2500
 
 # Filter RTs to lie within chosen range
-reads <- filterRTs(reads, 
-                   c(min.threshold, max.threshold),
-                   method = "thresholds", 
-                   remove.incorrect = TRUE, 
-                   remove.contexts = 300)
+reads <- removeOutliersSPR(reads,
+                           c(min.threshold, max.threshold),
+                           entire.trial = TRUE)
 
-# Data completeness check (for target region):
-# minimum and maximum number of datapoints per subject/condition
-min(xtabs(~ Cond + Subject + Region, data = reads))
-max(xtabs(~ Cond + Subject + Region, data = reads))
+reads <- removeOutliersContext(reads, min.rt = 500, max.rt = 30000)
 
-# Check that RTs are in the specified range 
-range(reads$RT)
+# Remove trials with incorrect plausibility rating
+reads <- removeIncorrect(reads)
+
+# Check the minimum remaining observations per condition:
+range(xtabs( ~ Cond + Subject + Region, data = reads))
 ```
 
 Define a plotting function:
@@ -99,16 +108,16 @@ Define a plotting function:
 # Define a line plot function
 line.plot <- function(df) {
   if (log.RTs == TRUE) {
-    y.axis.range <- c(5.5, 5.85)
+    y.axis.range <- c(5.45, 5.85)
   } else {
     y.axis.range <- c(225, 360)
   }
   p <- df %>%
     ggplot(aes(x = Region, y = MeanRT, color=Cond, group=Cond)) + 
       geom_point(size=2.5, shape="cross") + 
-      geom_line(size=0.5) +
+      geom_line(linewidth=0.5) +
       geom_errorbar(aes(ymin = MeanRT - SE, ymax = MeanRT + SE),
-                    width=0.1, size=0.3) +
+                    width=0.1, linewidth=0.3) +
       geom_vline(xintercept=0, linetype="dashed") +
       #geom_smooth(method = 'lm', se=TRUE, alpha = .2, aes(fill=Cond)) +
       scale_color_manual("Condition",  # Legend title
@@ -121,7 +130,7 @@ line.plot <- function(df) {
 ```
 
 
-## Sampling
+# Sampling
 
 Sample an equal number of participants per list (with replacement across, but not within, individual samples).
 
@@ -175,20 +184,20 @@ filename <- paste0("./plots/sample_",
 #png(file=filename, width = 1200, height = 800)  # good size for 12 samples
 png(file=filename, width = 900, height = 600)   # good size for 9 samples
 p <- grid.arrange(grobs = plot.list, nrow = 3,
-             top = textGrob(paste0("Mean ", 
-                                   ifelse(log.RTs == TRUE, "log ", ""),
-                                   " RTs for subsets of ",
-                                   Nsamples.per.list*4,
-                                   " randomly sampled subjects (",
-                                   Nsamples.per.list, 
-                                   " per list)"),
-                            gp=gpar(fontsize=20, fontface=2)))
+                  top = textGrob(paste0("Mean ", 
+                                       ifelse(log.RTs == TRUE, "log ", ""),
+                                       " RTs for subsets of ",
+                                       Nsamples.per.list*4,
+                                       " randomly sampled subjects (",
+                                       Nsamples.per.list, 
+                                       " per list)"),
+                                 gp=gpar(fontsize=20, fontface=2)))
 dev.off()
 plot(p)
 ```
 
 
-## Numeric inspection 
+# Numeric inspection 
 
 Calculate standard deviations of the different samples as a numeric indicator of the variability in the data.
 
