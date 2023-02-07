@@ -2,7 +2,10 @@
 title: "rRT analysis - plots for PLEAD 16-12-2022"
 author: "Miriam Schulz"
 date: "10/11/2022"
-output: html_document
+output:
+  html_document:
+    toc: true
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
@@ -10,27 +13,27 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, fig.height = 6, fig.width = 
 ```
 
 
-## About
+# About
 
 This script contains an rRT analysis of the inference reading time data (SPR1) based on the rERP approach in Brouwer, Delogu & Crocker (2020). 
 
 
-## Read data and preprocess
+# Read data and preprocess
 
-Read in the data, scale the predictors, etc.
+Read in the data, remove outliers, add log-transformed RTs, scale the predictors:
 
 ```{r include = FALSE}
 # Workspace and libraries
 rm(list = ls())
 library(tidyverse)
 library(lme4)
-library(broom)      # for tidy(modeloutput)
-library(gridExtra)  # for grid.arrange()
-library(grid)       # for textGrob() => change grid.arrange plot name font size 
-library(sciplot)    # for se() 
-library(RColorBrewer)
-source("results_SPR_functions.R")      # preprocessing and helper functions
-source("results_SPR_functions_rRT.R")  # rRT functions
+library(broom)             # for tidy(modeloutput)
+library(gridExtra)         # for grid.arrange()
+library(grid)              # for textGrob() => change grid.arrange plot name font size 
+library(sciplot)           # for se() 
+library(RColorBrewer)      # for color palettes
+source("functions.R")      # preprocessing and helper functions
+source("functions_rRT.R")  # rRT functions
 ```
 
 
@@ -38,8 +41,24 @@ source("results_SPR_functions_rRT.R")  # rRT functions
 # Read data
 df <- read.csv("results_reads.csv", header = TRUE)
 
+# Rename variables 
+rating_colnames <- str_remove(names(df), "Rating")
+names(df) <- rating_colnames
+df <- rename(df, ProdNorms = ProductionPercentage)
+
 # Exclude filler and practice trials
-df <- filter(df, Item < 100)
+df <- removeFillersPractice(df)
+
+# Remove outliers: SPR (word RTs)
+df <- removeOutliersSPR(df,
+                        criteria = c(50, 2500),
+                        entire.trial = TRUE)
+
+# Remove outliers: context sentence reading times
+df <- removeOutliersContext(df, min.rt=500, max.rt=30000)
+
+# Remove trials with incorrect plausibility ratings
+df <- removeIncorrect(df)
 
 # Transform variables to factors
 df$Cond <- as.factor(df$Cond)
@@ -49,10 +68,13 @@ df$Subject <- as.factor(as.numeric(as.character(df$Subject)))
 # Transform the binary plausibility predictor to numeric, then to factor
 df$Plausible <- as.factor(ifelse(df$Plausible == "Yes", 1, 0))
 
-# Exclude data
-df <- filterRTs(df, criteria = c(50, 2500), method = "thresholds",
-                remove.incorrect = TRUE, remove.contexts = 500,
-                regions = -2:2)
+# Due to strong collinearity between Inference+Coherence ratings,
+# create a new combined predictor that is the means of both ratings:
+df$InfCo <- (df$Inference + df$Coherence) / 2
+
+# Better: combine the predictors using PCA
+pca_fit <- stats::prcomp(select(df, Inference, Coherence), scale=TRUE)
+df$InfCoPC1 <- pca_fit$x[,1]
 
 # Invert predictor scales 
 #df$AssociationRating <- df$AssociationRating - 7
@@ -76,25 +98,28 @@ df$logRT <- log(df$RT)
 df$logRT_precrit1 <- log(df$RT_precrit1)
 df$logRT_precrit2 <- log(df$RT_precrit2)
 
-# Rename variables 
-rating_colnames <- str_remove(names(df), "Rating")
-names(df) <- rating_colnames
-df <- rename(df, ProdNorms = ProductionPercentage)
-
 # Order df by Region
-#df <- arrange(df, Region, Item, Cond)
 df <- arrange(df, Region)
 
 # Scale predictors (careful: needs to be performed AFTER removing data)
-df$Association <- scale(df$Association)
-df$Inference <- scale(df$Inference)
-df$Coherence <- scale(df$Coherence)
-df[, c("RT_precrit1", "RT_precrit2","logRT_precrit1","logRT_precrit2")] <- 
-  lapply(df[, c("RT_precrit1", "RT_precrit2","logRT_precrit1","logRT_precrit2")], scale)
+df2 <- scalePredictors(
+  df2,
+  c(
+    "Association",
+    "Inference",
+    "Coherence",
+    "InfCo",
+    "InfCoPC1",
+    "RT_precrit1",
+    "RT_precrit2",
+    "logRT_precrit1",
+    "logRT_precrit2"
+  )
+)
 ```
 
 
-### Define model parameters
+## Define model parameters
 
 Define general model parameters:
 
@@ -128,59 +153,82 @@ if (log.RTs == TRUE) {
 ```
 
 
-### Inspect the spread of variation across regions 
+## Inspect the spread of variation across regions 
 
 Check the *range* of the reading times in the critical regions (i.e. the spread of the variation).
 
 Larger ranges implies that the residuals will be larger due to the increased amount of gvariation in that region.
 
-
-```{r}
+```{r warning = FALSE, fig.width=10, fig.height=3}
+spread.color.palette <- c("-2" = "yellow3", 
+                          "-1" = "tan1",
+                          "0" = "red2",
+                          "1" = "magenta2", 
+                          "2" = "purple3")
 # Density plot
-ggplot(filter(df, Region %in% -2:2),
-       #aes(x = RT, group = Region, fill = factor(Region))) +
+p.spread.1 <- ggplot(filter(df, Region %in% -2:2),
        aes(x = RT, group = Region, color = factor(Region))) +
-  geom_density(adjust=0.8) +
-  #geom_histogram(alpha=.5, position = "identity") +
-  theme_minimal() +
-  xlim(c(100, 900)) +
+  geom_density(adjust=0.8, linewidth=1, key_glyph=draw_key_smooth) +
+  xlim(c(0, 1000)) +
+  ylab("Density") + 
   #scale_fill_manual(values = c("-1" = "black", "0" = "grey",
-  scale_color_manual("Region",
-                     values = c("-2" = "lightgreen", "-1" = "darkgreen",
-                                "0" = "red",
-                                "1" = "blue", "2" = "lightblue"),
-                     labels = c("precrit-2", "precrit-1", "crit",
-                                "spillover1", "spillover2")) + 
-  ggtitle("Spread of RTs by Region")
+  scale_color_manual("Region",  # Legend title
+                     values = spread.color.palette,
+                     labels = c("Precritical-2", "Precritical-1", "Critical",
+                                "Postcritical+1", "Postcritical+2")) + 
+  ggtitle("Spread of RTs by Region") +
+  theme_minimal()
+
+# Density plot
+p.spread.2 <- ggplot(filter(df, Region %in% -2:2),
+       aes(x = logRT, group = Region, color = factor(Region))) +
+  geom_density(adjust=0.8, linewidth=1, key_glyph=draw_key_smooth) +
+  #xlim(c(0, 1000)) +
+  ylab("Density") + 
+  #scale_fill_manual(values = c("-1" = "black", "0" = "grey",
+  scale_color_manual("Region",  # Legend title
+                     values = spread.color.palette,
+                     labels = c("Precritical-2", "Precritical-1", "Critical",
+                                "Postcritical+1", "Postcritical+2")) + 
+  ggtitle("Spread of RTs by Region (logRTs)") +
+  theme_minimal()
+
+grid.arrange(p.spread.1, p.spread.2, ncol=2)
 
 # Individual histograms
-#TODO: use grid.arrange to display histograms for each region side by side
+par(mfrow=c(1,4))
 for (r in-1:2) {
-  print(paste0("Region: ",
-               r,
-               " - Range: ",
-               paste(range(filter(df, Region == r)$RT),
-                     collapse = "-"),
-               "ms"))
   hist(
-    filter(df, Region == r)$RT,
-    breaks = 20,
-    xlim = c(100, 900),
-    ylim = c(0, 800),
-    xlab = "RT",
-    col = "steelblue",
-    #add = ifelse(r >= 0, TRUE, FALSE),
-    main = paste0("RTs in region: ", r)
+      filter(df, Region == r)$RT,
+      breaks = 20,
+      xlim = c(0, 1000),
+      ylim = c(0, 800),
+      xlab = "RT",
+      col = "steelblue",
+      main = paste0("RTs in region: ", r, " (for RT <= 1000 ms)")
   )
 }
+
+# Individual histograms with log RTs
+for (r in-1:2) {
+  hist(
+      filter(df, Region == r)$logRT,
+      breaks = 20,
+      xlim = c(4.5, 7.5),
+      ylim = c(0, 450),
+      xlab = "logRT",
+      col = "steelblue",
+      main = paste0("LogRTs in region: ", r)
+  )
+}
+par(mfrow=c(1,1))  # reset
 ```
 
 
+# Models 
 
-## Models 
 
-
-### Intercept (baseline) LM model
+## Intercept (baseline) LM model
 
 Following the logic of Brouwer et al. (2020), the analysis starts with a baseline model of the variance in the signal. 
 The baseline model assumes that no factors were manipulated and that all trials belong to the same condition. 
@@ -193,13 +241,6 @@ However, here we first start with an even simpler baseline model averaging over 
 ```{r, results = FALSE}
 # Model formula
 m.formula <- as.formula(paste0(DV, " ~ 1"))
-
-# Run a model for each region
-#m.intercept <- runModels(df, m.type, m.formula, regions = regions)
-
-# Generate plots
-#p <- generatePlots(m.intercept, "Intercept", m.type,
-#                   DV, y.unit, y.range, y.range.res) #, y.range.coefs
 
 # Run model(s) and generate plots 
 modelAndPlot("Intercept",
@@ -215,10 +256,9 @@ modelAndPlot("Intercept",
 
 
 
-### Models with a single predictor 
+## Models with a single predictor 
 
-
-#### Intercept + binary Plausibility LM
+### Intercept + binary Plausibility LM
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Plausible"))
@@ -234,8 +274,7 @@ modelAndPlot("Intercept+Plausibility",
 ```
 
 
-
-#### Intercept + Association LM
+### Intercept + Association LM
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Association"))
@@ -253,7 +292,7 @@ modelAndPlot(
 ```
 
 
-#### Intercept + Coherence LM
+### Intercept + Coherence LM
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Coherence"))
@@ -266,7 +305,7 @@ modelAndPlot(
 ```
 
 
-#### Intercept + Inference LM
+### Intercept + Inference LM
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Inference"))
@@ -279,7 +318,7 @@ modelAndPlot(
 ```
 
 
-#### Intercept + PrecritRT 1 LM
+### Intercept + PrecritRT 1 LM
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + ", paste0(precrit1)))
@@ -292,7 +331,7 @@ modelAndPlot(
 ```
 
 
-#### Intercept + PrecritRT 2 LM
+### Intercept + PrecritRT 2 LM
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + ", precrit2))
@@ -306,9 +345,9 @@ modelAndPlot(
 
 
 
-### Models with more than 1 predictor
+## Models with more than 1 predictor
 
-#### Intercept + Association + Coherence 
+### Intercept + Association + Coherence 
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence"))
@@ -321,7 +360,7 @@ modelAndPlot(
 ```
 
 
-#### Intercept + Association + Coherence + Precrit_RT1
+### Intercept + Association + Coherence + Precrit_RT1
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence + ", precrit1))
@@ -334,7 +373,7 @@ modelAndPlot(
 ```
 
 
-#### Intercept + Association + Inference + Precrit_RT1
+### Intercept + Association + Inference + Precrit_RT1
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Inference + ", precrit1))
@@ -347,7 +386,7 @@ modelAndPlot(
 ```
 
 
-#### Intercept + Association + Coherence + Precrit_RT2
+### Intercept + Association + Coherence + Precrit_RT2
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence + ", precrit2))
@@ -360,7 +399,7 @@ modelAndPlot(
 ```
 
 
-#### Intercept + Association + Coherence + Precrit_RT1 + Precrit_RT2 + Plausible
+### Intercept + Association + Coherence + Precrit_RT1 + Precrit_RT2 + Plausible
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV,
@@ -376,9 +415,9 @@ modelAndPlot(
 
 
 
-### Models with interaction terms
+## Models with interaction terms
 
-#### Association * Coherence
+### Association * Coherence
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ Association * Coherence "))
@@ -390,7 +429,7 @@ modelAndPlot(
 )
 ```
 
-#### Association * Coherence * precrit1
+### Association * Coherence * precrit1
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ Association * Coherence * ", precrit1))
@@ -402,7 +441,7 @@ modelAndPlot(
 )
 ```
 
-#### Association * Coherence * precrit2
+### Association * Coherence * precrit2
 
 ```{r, results = FALSE, fig.height = 6, fig.width = 9}
 m.formula <- as.formula(paste0(DV, " ~ Association * Coherence * ", precrit2))
@@ -414,7 +453,7 @@ modelAndPlot(
 )
 ```
 
-#### Intercept + Association * Coherence * precrit1 * precrit2
+### Intercept + Association * Coherence * precrit1 * precrit2
 
 ```{r, results = FALSE, fig.height = 6, fig.width = 9}
 m.formula <- as.formula(paste0(DV, " ~ Association * Coherence * ",
@@ -429,7 +468,7 @@ modelAndPlot(
 ```
 
 
-#### Intercept + Association + Coherence + Association : Coherence + RT_Precrit1
+### Intercept + Association + Coherence + Association : Coherence + RT_Precrit1
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(
@@ -453,10 +492,10 @@ ggsave(filename, plot = p, width = 5, height = 4)
 ```
 
 
-### lmer 
+## lmer 
 
 
-#### Intercept + Coherence, Random Intercepts 
+### Intercept + Coherence, Random Intercepts 
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Coherence +
@@ -469,7 +508,7 @@ modelAndPlot(
 )
 ```
 
-#### Intercept + Association + Coherence, Random Intercepts 
+### Intercept + Association + Coherence, Random Intercepts 
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence +
@@ -483,7 +522,7 @@ modelAndPlot(
 ```
 
 
-#### Intercept + Association + Coherence + Precrit1, Random Intercepts 
+### Intercept + Association + Coherence + Precrit1, Random Intercepts 
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence + ",
@@ -498,7 +537,7 @@ modelAndPlot(
 ```
 
 
-#### Intercept + Association + Coherence + Precrit1 + Association:Coherence, Random Intercepts 
+### Intercept + Association + Coherence + Precrit1 + Association:Coherence, Random Intercepts 
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence + Association:Coherence + ",
@@ -512,7 +551,7 @@ modelAndPlot(
 )
 ```
 
-#### Intercept + Association*Coherence*Precrit1, Random Intercepts 
+### Intercept + Association*Coherence*Precrit1, Random Intercepts 
 
 ```{r, results = FALSE}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Association* Coherence * ",
@@ -528,7 +567,7 @@ modelAndPlot(
 
 
 
-### Setting predictors to zero
+## Setting predictors to zero
 
 ```{r}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence +",
@@ -579,9 +618,9 @@ plotSPR(m, "Full", "Estimates: Full model", y.unit, y.range)
 ```
 
 
-### Models with ProductionNorms as predictor
+## Models with ProductionNorms as predictor
 
-#### Intercept + ProdNorms
+### Intercept + ProdNorms
 
 ```{r, results = FALSE}
 # Model formula

@@ -55,7 +55,7 @@ modelAndPlot <- function(plt.name,
 #'
 #' @examples
 runModels <- function(df, model.type, m.formula,
-                      regions = -1:2) {
+                      regions = -1:2, print.checks=FALSE) {
   
   # Print chosen model type 
   model.types <- c("lm" = "simple LM",
@@ -190,17 +190,19 @@ runModels <- function(df, model.type, m.formula,
   output <- cbind(df, output)
   
   ### Checks
-  # 1. Check if the model df and original RTs are identical
-  print(summary(output[, as.character(DV)] == output[, paste0("Model_", as.character(DV))]))
-  # 2. Check if the model's fitted values + residuals are equal to the original RV
-  print(summary(round(output$FittedValues + output$Residuals) == round(output[, as.character(DV)])))
-  # 3. Check that the mean of the residuals in each region is == 0
-  print(aggregate(Residuals ~ Region, FUN = meanRound, data = output))
-  # 4. Check if the fitted values are equal to the mean in the region 
-  fitted.means <- aggregate(FittedValues ~ Region, FUN = meanRound, data = output)
-  original.means <- aggregate(get(DV) ~ Region, FUN = meanRound, data = df)
-  fitted.vs.original.means <- merge(fitted.means, original.means, by = "Region")
-  print(fitted.vs.original.means)
+  if (print.checks == TRUE) {
+    # 1. Check if the model df and original RTs are identical
+    print(summary(output[, as.character(DV)] == output[, paste0("Model_", as.character(DV))]))
+    # 2. Check if the model's fitted values + residuals are equal to the original RV
+    print(summary(round(output$FittedValues + output$Residuals) == round(output[, as.character(DV)])))
+    # 3. Check that the mean of the residuals in each region is == 0
+    print(aggregate(Residuals ~ Region, FUN = meanRound, data = output))
+    # 4. Check if the fitted values are equal to the mean in the region 
+    fitted.means <- aggregate(FittedValues ~ Region, FUN = meanRound, data = output)
+    original.means <- aggregate(get(DV) ~ Region, FUN = meanRound, data = df)
+    fitted.vs.original.means <- merge(fitted.means, original.means, by = "Region")
+    print(fitted.vs.original.means)
+  }
   
   # Return output data frame
   output
@@ -223,7 +225,9 @@ runModels <- function(df, model.type, m.formula,
 #'
 #' @examples
 generatePlots <- function(model.output, model.name, model.type,
-                          DV, y.unit, y.range, y.range.res, 
+                          DV,
+                          y.unit, y.range,
+                          y.range.res, 
                           coef.plot = TRUE) {
   
   # Add model type to model name:

@@ -106,6 +106,19 @@ aggMeansSE <- function(df, var.list) {
   means.cond
 }
 
+#' Scale several predictor variables at once
+#'
+#' @param df A data frame
+#' @param predictor.list A list of predictors to be scaled
+#'
+#' @return A data frame with scaled versions of the selected predictors
+#' @export
+#'
+#' @examples scalePredictors(df, c("Inference", "Coherence", "Association"))
+scalePredictors <- function(df, predictor.list) {
+  df[, predictor.list] <- lapply(df[, predictor.list], scale)
+  df
+}
 
 
 #######################

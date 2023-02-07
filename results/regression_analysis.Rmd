@@ -41,9 +41,6 @@ source("functions_rRT.R")  # rRT functions
 # Read data
 df <- read.csv("results_reads.csv", header = TRUE)
 
-# Exclude filler and practice trials
-df <- removeFillersPractice(df)
-
 # Transform variables to factors
 df$Cond <- as.factor(df$Cond)
 df$Item <- as.factor(as.numeric(as.character(df$Item)))
@@ -51,6 +48,9 @@ df$Subject <- as.factor(as.numeric(as.character(df$Subject)))
 
 # Transform the binary plausibility predictor to numeric, then to factor
 df$Plausible <- as.factor(ifelse(df$Plausible == "Yes", 1, 0))
+
+# Exclude filler and practice trials
+df <- removeFillersPractice(df)
 
 # Remove outliers: SPR (word RTs)
 df <- removeOutliersSPR(df,
@@ -151,7 +151,7 @@ ggplot(filter(df, Region %in% -2:2),
        aes(x = RT, group = Region, color = factor(Region))) +
   geom_density(adjust=0.8) +
   theme_minimal() +
-  xlim(c(100, 900)) +
+  xlim(c(0, 1000)) +
   #scale_fill_manual(values = c("-1" = "black", "0" = "grey",
   scale_color_manual("Region",
                      values = c("-2" = "lightgreen", "-1" = "darkgreen",
@@ -164,25 +164,16 @@ ggplot(filter(df, Region %in% -2:2),
 # Individual histograms
 par(mfrow=c(1,4))
 for (r in-1:2) {
-  #print(paste0("Region: ",
-  #             r,
-  #             " - Range: ",
-  #             paste(range(filter(df, Region == r)$RT),
-  #                   collapse = "-"),
-  #             "ms"))
   hist(
       filter(df, Region == r)$RT,
       breaks = 20,
       xlim = c(0, 1000),
-      #ylim = c(0, 800),
+      ylim = c(0, 800),
       xlab = "RT",
       col = "steelblue",
-      #add = ifelse(r >= 0, TRUE, FALSE),
-      main = "text"
-      #main = cat(sprintf("RTs in region: %s (50 <= RT <= 1000ms)", r))
+      main = paste0("RTs in region: ", r, "(for RT <= 1000 ms)")
   )
 }
-
 par(mfrow=c(1,1))  # reset
 ```
 
