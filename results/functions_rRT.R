@@ -288,7 +288,7 @@ plotSPR <- function(df, DV, plt.title, y.unit, y.range) {
     geom_line(linewidth=0.5) +
     geom_errorbar(aes(ymin = get(y.var) - SE,
                       ymax = get(y.var) + SE),
-                  width=0.1, size=0.3) +
+                  width=0.1, linewidth=0.3) +
     ylim(y.range[1], y.range[2]) +
     ylab(y.unit) +
     ggtitle(plt.title) +
@@ -349,7 +349,7 @@ plotCoefs <- function(df, DV, plt.title, y.unit, y.range) {
     geom_line(linewidth=0.5) +
     geom_errorbar(aes(ymin = MeanEstimate - SE,
                       ymax = MeanEstimate + SE),
-                  width=0.1, size=0.3) +
+                  width=0.1, linewidth=0.3) +
     #ylim(y.range[1], y.range[2]) +  # remove ylim for coef plots!
     ylab(y.unit) +
     ggtitle(plt.title) +
