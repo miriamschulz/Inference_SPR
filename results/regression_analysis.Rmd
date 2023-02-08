@@ -261,9 +261,10 @@ aggregMeans(df,
 Plot:
 
 ```{r}
-df <- filter(df, !Item %in% c(5, 13, 25))
+#df <- filter(df, !Item %in% c(5, 13, 25))
 plotSPR(df, "RT", "RT", c(260, 325))
 plotSPR(df, "logRT", "logRT", c(5.52,5.73))
+ggsave("./plots/p000delete.pdf", last_plot(), dpi=300)
 ```
 
 
