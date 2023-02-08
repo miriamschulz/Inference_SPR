@@ -291,8 +291,9 @@ mean(ratings$Decision)
 range(ratings$DecisionRT)
 
 # Mean and SE of ratings, outliers removed
-aggMeansSE(filter(ratings, DecisionRT >= 150, DecisionRT <= 30000),
-           c("DecisionRT", "Cond"))
+aggregMeans(filter(ratings, DecisionRT >= 150, DecisionRT <= 30000),
+           as.formula(DecisionRT ~ Cond),
+           round.data=TRUE)
 
 # Histograms
 
@@ -354,13 +355,14 @@ grid.arrange(p1, p2, ncol=2)
 ### Rating accuracy by condition
 
 ```{r fig.width=7, fig.height=4}
-cond.accs <- aggMeansSE(ratings, c("RatingCorrect", "Cond"))
-cond.accs <- cond.accs %>% rename("MeanAccuracy" = "MeanRatingCorrect")
+cond.accs <- aggregMeans(ratings, as.formula(RatingCorrect ~ Cond))
+#cond.accs <- cond.accs %>% rename("MeanAccuracy" = "RatingCorrect.Mean")
 cond.accs %>% 
-  ggplot(aes(x = Cond, y = MeanAccuracy, fill=Cond)) + 
+  ggplot(aes(x = Cond, y = Mean, fill=Cond)) + 
   #geom_point() + 
   geom_bar(stat="identity") + 
-  geom_errorbar(aes(ymin = MeanAccuracy - SE, ymax = MeanAccuracy + SE),
+  geom_errorbar(aes(ymin = Mean - SE,
+                    ymax = Mean + SE),
                 width=0.1, linewidth=0.3) +
   theme_minimal()
 ```
@@ -449,7 +451,8 @@ reads.full <- removeOutliersSPR(
   entire.trial = FALSE,
   regions = -100:100
 )
-(means.cond.all <- aggMeansSE(reads.full, c("RT", "Cond")))
+(means.cond.all <- aggregMeans(reads.full, as.formula(RT ~ Cond),
+                               round.data = TRUE))
 ```
 
 ### Critical regions reading times
@@ -507,14 +510,14 @@ Critical regions:
 
 ```{r}
 # Prepare data: aggregate by Cond+Region and get SE
-means.cond <- aggMeansSE(reads, c("RT", "Cond", "Region"))
+means.cond <- aggregMeans(reads, as.formula(RT ~ Cond + Region))
 
 # Line plot: 
 means.cond %>% 
-  ggplot(aes(x = as.factor(Region), y = MeanRT, color=Cond, group=Cond)) + 
+  ggplot(aes(x = as.factor(Region), y = Mean, color=Cond, group=Cond)) + 
   geom_point(size=2.5, shape="cross") + 
   geom_line(linewidth=0.5) +
-  geom_errorbar(aes(ymin = MeanRT - SE, ymax = MeanRT + SE),
+  geom_errorbar(aes(ymin = Mean - SE, ymax = Mean + SE),
                 width=0.1, linewidth=0.3) +
   ggtitle("Mean RT per Region (filtered RTs)") +
   theme_minimal()
@@ -526,14 +529,14 @@ reads <- removeRegions(reads, keep.regions = -1:2)
 ### Line plots by subject
 
 ```{r fig.width=10, fig.height=8}
-means.cond.subj <- aggMeansSE(reads, c("RT", "Cond", "Region", "Subject"))
+means.cond.subj <- aggregMeans(reads, as.formula(RT ~ Cond + Region + Subject))
 
 # Line plot: 
 means.cond.subj %>% 
-  ggplot(aes(x = Region, y = MeanRT, color=Cond, group=Cond)) + 
+  ggplot(aes(x = Region, y = Mean, color=Cond, group=Cond)) + 
   geom_point(size=2.5, shape="cross") + 
   geom_line(linewidth=0.5) +
-  geom_errorbar(aes(ymin = MeanRT - SE, ymax = MeanRT + SE),
+  geom_errorbar(aes(ymin = Mean - SE, ymax = Mean + SE),
                 width=0.1, linewidth=0.3) +
   facet_wrap(~ Subject) + 
   theme_minimal()
@@ -542,14 +545,14 @@ means.cond.subj %>%
 ### Line plots by Item
 
 ```{r fig.width=10, fig.height=8}
-means.cond.item <- aggMeansSE(reads, c("RT", "Cond", "Region", "Item"))
+means.cond.item <- aggregMeans(reads, as.formula(RT ~ Cond + Region + Item))
 
 # Line plot: 
 means.cond.item %>% 
-  ggplot(aes(x = Region, y = MeanRT, color=Cond, group=Cond)) + 
+  ggplot(aes(x = Region, y = Mean, color=Cond, group=Cond)) + 
   geom_point(size=2.5, shape="cross") + 
   geom_line(size=0.5) +
-  geom_errorbar(aes(ymin = MeanRT - SE, ymax = MeanRT + SE),
+  geom_errorbar(aes(ymin = Mean - SE, ymax = Mean + SE),
                 width=0.1, linewidth=0.3) +
   facet_wrap(~ Item) + 
   theme_minimal()
@@ -610,21 +613,20 @@ nrow(filter(contexts, ContextRT > 10000))
 nrow(filter(contexts, ContextRT < 750))
 
 # Mean context RTs by condition 
-context.reads <- aggMeansSE(contexts, c("ContextRT", "Cond"))
+context.reads <- aggregMeans(contexts, as.formula(ContextRT ~ Cond))
 
 # Mean context RT by condition + subject
-contextRTs.by.participant <- aggMeansSE(contexts, c("ContextRT", "Cond", "Subject"))
-range(round(contextRTs.by.participant$MeanContextRT))
+context.reads.subj <- aggregMeans(contexts,
+                                  as.formula(ContextRT ~ Cond + Subject))
+range(round(context.reads.subj$Mean))
 
 # Barplot: 
 context.reads %>%
-  #filter(Cond %in% c("A", "B", "C", "D")) %>% 
-  ggplot(aes(x = Cond, y = MeanContextRT, fill=Cond)) + 
+  ggplot(aes(x = Cond, y = Mean, fill=Cond)) + 
   geom_bar(stat="identity") + 
-  geom_errorbar(aes(ymin = MeanContextRT-SE, ymax = MeanContextRT+SE),
+  geom_errorbar(aes(ymin = Mean-SE,
+                    ymax = Mean+SE),
                 width=0.1, linewidth=0.3) +
   ggtitle("Mean context reading time by condition") +
   theme_minimal()
 ```
-
-
