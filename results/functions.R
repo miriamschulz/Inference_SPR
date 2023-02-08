@@ -66,8 +66,7 @@ aggregMeans <- function(df,
                         #na.rm=F,
                         FUN = function(x) {c(Mean = mean(x),
                                              SD = sd(x),
-                                             SE = sd(x) / sqrt(n),
-                                             SE2 = sciplot::se(x))})
+                                             SE = sd(x) / sqrt(n))})
   if (round.data == TRUE) {
     agg.data <- agg.data %>% 
       mutate_if(is.numeric, round, 2)
@@ -76,8 +75,8 @@ aggregMeans <- function(df,
   agg.data <- do.call(data.frame, agg.data)
   # Rename last columns
   newnames <- colnames(agg.data)[!colnames(agg.data) %in% 
-                                   tail(colnames(agg.data), 4)]
-  names(agg.data) <- c(newnames, "Mean", "SD", "SE", "SE.sciplot")
+                                   tail(colnames(agg.data), 3)]
+  names(agg.data) <- c(newnames, "Mean", "SD", "SE")
   agg.data
 }
 
