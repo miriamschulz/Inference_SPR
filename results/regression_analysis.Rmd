@@ -1,5 +1,5 @@
 ---
-title: "rRT analysis - plots for PLEAD 16-12-2022"
+title: "SPR results: regression-based analysis of the reading times"
 author: "Miriam Schulz"
 date: "10/11/2022"
 output:
@@ -36,29 +36,161 @@ source("functions.R")      # preprocessing and helper functions
 source("functions_rRT.R")  # rRT functions
 ```
 
+Read in data and remove fillers, practice and non-critical regions:
 
-```{r}
+```{r message=FALSE}
 # Read data
 df <- read.csv("results_reads.csv", header = TRUE)
-
-# Rename variables 
-rating_colnames <- str_remove(names(df), "Rating")
-names(df) <- rating_colnames
-df <- rename(df, ProdNorms = ProductionPercentage)
 
 # Exclude filler and practice trials
 df <- removeFillersPractice(df)
 
-# Remove outliers: SPR (word RTs)
-df <- removeOutliersSPR(df,
-                        criteria = c(50, 2500),
-                        entire.trial = TRUE)
+# Exclude non-critical regions
+df <- removeRegions(df, keep.regions=-1:2)
+```
 
+Visualize histograms and QQ plots before removing outliers:
+
+
+Histograms and residual plots (no outliers excluded):
+
+```{r echo=FALSE, fig.width=10, fig.height=10}
+par(mfrow=c(2,2))
+# Histograms
+
+# Histogram of RTs:
+hist(df$RT,
+     breaks = 50,
+     col='steelblue',
+     main='Raw RTs')
+
+# Histogram of log RTs :
+hist(log(df$RT),
+     breaks = 50,
+     col='steelblue',
+     main='Log-transformed RTs')
+
+# QQ plots
+
+# Untransformed RTs
+qqnorm(df$RT,
+       col='steelblue',
+       pch=16,
+       main='QQ plot of raw RTs')
+
+# Log-transformed RTs
+qqnorm(log(df$RT),
+       col='steelblue',
+       pch=16,
+       main='QQ plot of log-transformed RTs')
+# Save plot
+#ggsave("./plots/RT_hist_QQ.pdf", plot = last_plot(),
+#       width = 10, height = 10, dpi = 300)
+par(mfrow=c(1,1))  # reset
+```
+
+Remove SPR outliers:
+
+```{r message=FALSE}
+# Optional: remove items with low accuracy in B
+#df <- filter(df, ! Item %in% c(5,13,25))
+
+# Remove outliers: SPR (word RTs) - SD
+df <- removeOutliersSPR(df,
+                         method="sd",
+                         sd.value=4,
+                         entire.trial = TRUE,
+                         regions = -1:2)
+
+# Remove outliers: SPR (word RTs) - threshold values
+#df <- removeOutliersSPR(df,
+#                        method="threshold",
+#                        min.rt=100,
+#                        max.rt=1000,
+#                        entire.trial = TRUE,
+#                        regions = -1:2)
+```
+
+Histograms and residual plots after removing SPR outliers:
+
+```{r echo=FALSE, fig.width=10, fig.height=10}
+par(mfrow=c(2,2))
+# Histograms
+
+# Histogram of RTs:
+hist(df$RT,
+     breaks = 50,
+     col='steelblue',
+     main='Raw RTs')
+
+# Histogram of log RTs :
+hist(log(df$RT),
+     breaks = 50,
+     col='steelblue',
+     main='Log-transformed RTs')
+
+# QQ plots
+
+# Untransformed RTs
+qqnorm(df$RT,
+       col='steelblue',
+       pch=16,
+       main='QQ plot of raw RTs')
+
+# Log-transformed RTs
+qqnorm(log(df$RT),
+       col='steelblue',
+       pch=16,
+       main='QQ plot of log-transformed RTs')
+# Save plot
+#ggsave("./plots/RT_hist_QQ.pdf", plot = last_plot(),
+#       width = 10, height = 10, dpi = 300)
+par(mfrow=c(1,1))  # reset
+```
+
+Box-Cox plot:
+
+```{r echo=FALSE, fig.width=4, fig.height=4}
+# Boxcox plot
+MASS::boxcox(df$RT ~ df$Cond)
+```
+
+Normality test (Shapiro-Wilk):
+
+```{r}
+# Untransformed RTs:
+shapiro.test(filter(df, Region >= 0)$RT)
+
+# Log-transformed RTs:
+shapiro.test(log(filter(df, Region >= 0)$RT))
+```
+
+Remove context sentence outliers and incorrect rating trials: 
+
+```{r}
 # Remove outliers: context sentence reading times
 df <- removeOutliersContext(df, min.rt=500, max.rt=30000)
 
 # Remove trials with incorrect plausibility ratings
 df <- removeIncorrect(df)
+```
+
+
+Further preprocessing: 
+
+- Rename variables
+- Transform to factor when necessary
+- Combine Inference+Coherence ratings into a new combined predictor with PCA, extracting the first component
+- add precritical reading times as predictors 
+- add log-transformed versions of the reading times (the SPR RT (DV) as well as predictors (IVs))
+- standardize the predictors
+
+
+```{r message=FALSE}
+# Rename variables 
+rating_colnames <- str_remove(names(df), "Rating")
+names(df) <- rating_colnames
+df <- rename(df, ProdNorms = ProductionPercentage)
 
 # Transform variables to factors
 df$Cond <- as.factor(df$Cond)
@@ -68,12 +200,8 @@ df$Subject <- as.factor(as.numeric(as.character(df$Subject)))
 # Transform the binary plausibility predictor to numeric, then to factor
 df$Plausible <- as.factor(ifelse(df$Plausible == "Yes", 1, 0))
 
-# Due to strong collinearity between Inference+Coherence ratings,
-# create a new combined predictor that is the means of both ratings:
-df$InfCo <- (df$Inference + df$Coherence) / 2
-
 # Better: combine the predictors using PCA
-pca_fit <- stats::prcomp(select(df, Inference, Coherence), scale=TRUE)
+pca_fit <- stats::prcomp(dplyr::select(df, Inference, Coherence), scale=TRUE)
 df$InfCoPC1 <- pca_fit$x[,1]
 
 # Invert predictor scales 
@@ -88,34 +216,54 @@ df.precrit1 <- filter(df, Region == -1) %>%
 df <- merge(df, df.precrit1, by = c("Item", "Cond", "Subject"))
 
 # Extract precritical RT -2 and add to df:
-df.precrit2 <- filter(df, Region == -2) %>% 
-  dplyr::select(Item, Cond, Subject, RT) %>% 
-  rename(RT_precrit2 = RT)
-df <- merge(df, df.precrit2, by = c("Item", "Cond", "Subject"))
+#df.precrit2 <- filter(df, Region == -2) %>% 
+#  dplyr::select(Item, Cond, Subject, RT) %>% 
+#  rename(RT_precrit2 = RT)
+#df <- merge(df, df.precrit2, by = c("Item", "Cond", "Subject"))
 
 # Add log-transformed RTs
 df$logRT <- log(df$RT)
 df$logRT_precrit1 <- log(df$RT_precrit1)
-df$logRT_precrit2 <- log(df$RT_precrit2)
+#df$logRT_precrit2 <- log(df$RT_precrit2)
 
 # Order df by Region
 df <- arrange(df, Region)
 
 # Scale predictors (careful: needs to be performed AFTER removing data)
-df2 <- scalePredictors(
-  df2,
+df <- scalePredictors(
+  df,
   c(
+    "ProdNorms",
     "Association",
     "Inference",
     "Coherence",
-    "InfCo",
     "InfCoPC1",
     "RT_precrit1",
-    "RT_precrit2",
-    "logRT_precrit1",
-    "logRT_precrit2"
+    #"RT_precrit2",
+    "logRT_precrit1"
+    #"logRT_precrit2"
   )
 )
+
+str(df)
+```
+
+## First inspection: RTs per region
+
+Numeric:
+
+```{r}
+aggregMeans(df,
+            as.formula(RT ~ Cond + Region),
+            round.data=TRUE)
+```
+
+Plot:
+
+```{r}
+df <- filter(df, !Item %in% c(5, 13, 25))
+plotSPR(df, "RT", "RT", c(260, 325))
+plotSPR(df, "logRT", "logRT", c(5.52,5.73))
 ```
 
 
@@ -150,6 +298,7 @@ if (log.RTs == TRUE) {
   y.range <- c(260, 320)
   y.range.res <- c(-20, 20)
 }
+knitr::knit_exit()
 ```
 
 
