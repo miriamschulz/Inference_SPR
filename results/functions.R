@@ -24,16 +24,65 @@
 #' Calculate mean and round to two digits
 #'
 #' @param x A numeric vector
+#' @param d An integer: number of decimal places (default = 2)
 #'
 #' @return A number rounded to two decimals
 #' @export
 #'
 #' @examples
 #' meanRound(c(2.222, 9.999))
-meanRound <- function(x) {round(mean(x), digits = 2)}
+meanRound <- function(x, d=2) {round(mean(x), digits = d)}
 
 
-#' Aggregate data using the mean and standard error
+#' Standard error
+#'
+#' @param x A numeric vector
+#' @param n An integer: sample size (default = 40)
+#'
+#' @return
+#' @export
+#'
+#' @examples
+se <- function(x, n=40) {sd(x) / sqrt(n)}
+
+
+#' Aggregate data using the mean, SD and SE
+#'
+#' @param df A data frame
+#' @param agg.formula A formula as input for the aggregate function
+#' @param n 
+#' @param round.data Boolean: if TRUE, rounds numbers to 2 decimal places
+#'
+#' @return
+#' @export
+#'
+#' @examples
+aggregMeans <- function(df,
+                        agg.formula, 
+                        n=40,
+                        round.data = FALSE) {
+  agg.data <- aggregate(agg.formula,
+                        data = df,
+                        #na.rm=F,
+                        FUN = function(x) {c(Mean = mean(x),
+                                             SD = sd(x),
+                                             SE = sd(x) / sqrt(n),
+                                             SE2 = sciplot::se(x))})
+  if (round.data == TRUE) {
+    agg.data <- agg.data %>% 
+      mutate_if(is.numeric, round, 2)
+  }
+  # Transform to data frame
+  agg.data <- do.call(data.frame, agg.data)
+  # Rename last columns
+  newnames <- colnames(agg.data)[!colnames(agg.data) %in% 
+                                   tail(colnames(agg.data), 4)]
+  names(agg.data) <- c(newnames, "Mean", "SD", "SE", "SE.sciplot")
+  agg.data
+}
+
+
+#' Aggregate data using the mean and standard error (OLD FUNCTION)
 #'
 #' @description
 #' Data are aggregated using the mean and se function.
@@ -42,14 +91,23 @@ meanRound <- function(x) {round(mean(x), digits = 2)}
 #'
 #' @param df A data frame 
 #' @param var.list A character vector of the variables (DV first, then 1-3 IVs)
+#' @param use.sd Boolean: if true, uses the SD function instead of SE
+#' @param n An integer: sample size to calculate the standard error
 #'
 #' @return A data frame of the aggregated means and the SE
 #' @export
 #'
 #' @examples
 #' aggMeansSE(df, c("RT", "Cond", "Region"))
-aggMeansSE <- function(df, var.list) {
+aggMeansSE <- function(df, var.list, use.sd=FALSE, n=40) {
   
+  if (use.sd==TRUE) {
+    var.function = sd
+    var.name = "SD"
+  } else {
+    var.function = se
+    var.name = "SE"
+  }
   if (length(var.list) == 2) {
     
     y <- parse(text = var.list[1])
@@ -57,13 +115,13 @@ aggMeansSE <- function(df, var.list) {
     means.cond <- aggregate(eval(y) ~ eval(var1),
                             data = df,
                             FUN = mean)
-    means.condSE <- aggregate(eval(y) ~ eval(var1),
-                              data = df,
-                              FUN = se)
+    means.condVAR <- aggregate(eval(y) ~ eval(var1),
+                               data = df,
+                               FUN = var.function)
     var.list <- var.list[-1]  # remove y
     colnames(means.cond) <- c(var.list, paste0("Mean", y))
-    colnames(means.condSE) <- c(var.list, "SE")
-    means.cond <- merge(means.cond, means.condSE, by=var.list)
+    colnames(means.condVAR) <- c(var.list, var.name)
+    means.cond <- merge(means.cond, means.condVAR, by=var.list)
     
   } else if (length(var.list) == 3) {
     
@@ -73,13 +131,13 @@ aggMeansSE <- function(df, var.list) {
     means.cond <- aggregate(eval(y) ~ eval(var1) + eval(var2),
                             data = df,
                             FUN = mean)
-    means.condSE <- aggregate(eval(y) ~ eval(var1) + eval(var2),
-                              data = df,
-                              FUN = se)
+    means.condVAR <- aggregate(eval(y) ~ eval(var1) + eval(var2),
+                               data = df,
+                               FUN = var.function)
     var.list <- var.list[-1]  # remove y
     colnames(means.cond) <- c(var.list, paste0("Mean", y))
-    colnames(means.condSE) <- c(var.list, "SE")
-    means.cond <- merge(means.cond, means.condSE, by=var.list)
+    colnames(means.condVAR) <- c(var.list, var.name)
+    means.cond <- merge(means.cond, means.condVAR, by=var.list)
     
   } else if (length(var.list) == 4) {
     
@@ -89,22 +147,21 @@ aggMeansSE <- function(df, var.list) {
     var3 <- parse(text = var.list[4])
     means.cond <- aggregate(eval(y) ~ eval(var1) + eval(var2) + eval(var3),
                             data = df,
-                            FUN = mean,   # function to apply
-                            na.rm = T)    # ignore NAs
-    means.condSE <- aggregate(eval(y) ~ eval(var1) + eval(var2) + eval(var3),
-                              data = df,
-                              FUN = se,    # function to apply
-                              na.rm = T)   # ignore NAs
+                            FUN = mean)
+    means.condVAR <- aggregate(eval(y) ~ eval(var1) + eval(var2) + eval(var3),
+                               data = df,
+                               FUN = var.function)
     var.list <- var.list[-1]  # remove y
     colnames(means.cond) <- c(var.list, paste0("Mean", y))
-    colnames(means.condSE) <- c(var.list, "SE")
-    means.cond <- merge(means.cond, means.condSE, by=var.list)
+    colnames(means.condVAR) <- c(var.list, var.name)
+    means.cond <- merge(means.cond, means.condVAR, by=var.list)
     
   } else {
     stop("This function takes as input a dataframe and a list of 2-4 variables, starting with Y, then X.")
   }
   means.cond
 }
+
 
 #' Scale several predictor variables at once
 #'
@@ -199,7 +256,7 @@ getReads <- function(df) {
   df.order.table$Order <- ifelse(df.order.table$Block == "Block3", 1, 2)
   df.order.table$Block <- NULL
   df.order.table <- unique(df.order.table)
-  df <- plyr::join(df, df.order.table)
+  df <- suppressMessages(plyr::join(df, df.order.table))
   
   # Step 1: get ratings df
   ratings <- df[df$Label != "instructions", ]
@@ -248,7 +305,7 @@ getReads <- function(df) {
                          List = 1:8)
   df.list.table <- merge(df.list.table, df.lists, by="TrialNum")
   df.list.table$TrialNum <- NULL  # not needed 
-  df <- plyr::join(df, df.list.table)
+  df <- suppressMessages(plyr::join(df, df.list.table))
   
   df
 }
@@ -371,9 +428,9 @@ removeIncorrect <- function(df) {
 #'
 #' @return
 printDataLoss <- function(nrow.start, nrow.end) {
-  cat(sprintf("\nRemoving outliers values affected %s%% of the data.\n",
+  cat(sprintf("Removing outliers values affected %s%% of the data.\n",
           (round(1-(nrow.end/nrow.start), 4))*100))
-  cat(sprintf("Original N rows: %s, new N rows: %s.\n", nrow.start, nrow.end))
+  cat(sprintf("Data points lost: %s\n", nrow.start-nrow.end))
 }
 
 
@@ -394,9 +451,10 @@ printDataLoss <- function(nrow.start, nrow.end) {
 #' based on values in other regions as well (include all: regions = -100:100).
 #'
 #' @param df A dataframe containing the reading time data
-#' @param criteria Depending on the chosen method, 
-#' either a numeric vector of length 2 containing the min and max threshold,
-#' or an integer/float specifying the SD for exclusion 
+#' @param method A string: accepts either "sd" or "threshold" 
+#' @param min.rt An integer: lower bound for RT exclusion 
+#' @param max.rt An integer: upper bound for RT exclusion 
+#' @param sd.value An integer or float: sd value for sd-based exclusion
 #' @param entire.trial Boolean
 #' @param regions A numeric vector: regions that serve as basis for entire.trial
 #'
@@ -404,26 +462,19 @@ printDataLoss <- function(nrow.start, nrow.end) {
 #' @export
 #'
 #' @examples
-#' removeOutliersSPR(df, c(50, 2500), entire.trial=TRUE)
-#' removeOutliersSPR(df, 2, entire.trial=FALSE)
+#' removeOutliersSPR(df, "threshold", min.rt=100, max.rt=3000)
+#' removeOutliersSPR(df, "sd", 2, entire.trial=FALSE)
 removeOutliersSPR <- function(df,
-                             criteria,
-                             entire.trial = TRUE,
-                             regions = -1:2) {
-
-  if (length(criteria)==1) {
-    method = "sd"
-  } else {
-    method = "threshold"
-  }
+                              method,
+                              min.rt=50,
+                              max.rt=2500,
+                              sd.value=2.5,
+                              entire.trial = TRUE,
+                              regions = -1:2) {
   
   nrow.start <- nrow(df)  # store original size of df
   
   if (method == "threshold") {
-  
-    # Unpack min and max threshold
-    min.rt <- criteria[1]
-    max.rt <- criteria[2]
     
     cat(sprintf("Filtering RTs using method: hard thresholds (%s ms < RT < %s ms)\n",
             min.rt, max.rt))
@@ -431,38 +482,60 @@ removeOutliersSPR <- function(df,
     # Mark trials to exclude
     df$ExcludeTrial <- ifelse((df$RT < min.rt | df$RT > max.rt), "yes", "no")
     
-    if (entire.trial==TRUE) {
-      df.exclude <- filter(df,
-                           ExcludeTrial == "yes",
-                           Region %in% regions)
-      df$ExcludeTrial <- ifelse(
-        (
-          df$Item %in% df.exclude$Item & df$Cond %in% df.exclude$Cond &
-            df$Subject %in% df.exclude$Subject
-        ),
-        "yes",
-        df$ExcludeTrial  # this will still remove words with original "yes"
-      )
-    }
-    
-    # Remove trials
-    df <- filter(df, ExcludeTrial=="no")
-    df$ExcludeTrial <- NULL
-    
   } else if (method == "sd") {
     
     cat(sprintf("Filtering RTs using method: SD by participant (cutoff value: +- %s SD(s))\n",
-            criteria))
+            sd.value))
     
-    #TODO: do the following BY SUBJECT, not by grand mean of RTs
-    sd.value <- criteria
-    sd.interval <- sd(df$RT) * sd.value
-    dfExcludeTrial <- ifelse((RT < mean(RT) - sd.interval) | 
-                               (RT > mean(RT) + sd.interval), 
-                             "yes", "no")
-    df <- filter(df, ExcludeTrial == "no")
-    df$ExcludeTrial <- NULL
+    participant.SDs <- df %>% 
+      group_by(Subject) %>% 
+      summarize(SubjectMean = mean(RT),
+                SubjectSD = sd(RT))
+      df <- merge(df, participant.SDs, by="Subject", all=TRUE)
+      #df$ExcludeTrial <- ifelse((df$RT > df$SubjectMean + sd.value*df$SubjectSD | 
+      #                             df$RT < df$SubjectMean - sd.value*df$SubjectSD),
+      #                          "yes",
+      #                          "no")
+      
+      df$UpperBound <- df$SubjectMean + sd.value*df$SubjectSD
+      df$LowerBound <- df$SubjectMean - sd.value*df$SubjectSD
+      df$ExcludeTrial <- ifelse((df$RT > df$UpperBound | df$RT < df$LowerBound),
+                                "yes", "no")
+      df$UpperBound <- NULL
+      df$LowerBound <- NULL
+
+  } else {
+    stop("Please select a valid method (threshold or sd).")
   }
+  
+  # Optional: if a remove-marked data point is in a target region,
+  # mark the entire trial for exclusion
+  if (entire.trial==TRUE) {
+    # Create df for target regions: trials which will have to be excluded
+    df.exclude <- filter(df,
+                         ExcludeTrial == "yes",
+                         Region %in% regions)
+    #print(nrow(df.exclude))
+
+    # Update the exclusion criteria for all data points: 
+    # Does the trial have a remove-marked data point in the critical regions?
+    df.exclude.mini <- dplyr::select(df.exclude, Item, Cond, Subject)
+    df.mini <- dplyr::select(df, Item, Cond, Subject)
+    for (r in 1:nrow(df.mini)) {
+      row <- df.mini[r, ]
+      match.found <- nrow(suppressMessages(plyr::match_df(df.exclude.mini, row)))
+      # Update the trial exclusion marking
+      if (match.found > 0) {
+        df[r, "ExcludeTrial"] <- "yes"
+      }
+    }
+  }
+
+  #print(summary(as.factor(df$ExcludeTrial)))
+
+  # Remove marked trials
+  df <- filter(df, ExcludeTrial=="no")
+  df$ExcludeTrial <- NULL
   
   nrow.end <- nrow(df)  # store new size of df
   
@@ -485,8 +558,50 @@ removeOutliersSPR <- function(df,
 #' removeOutliersContext(df, min.rt=500, max.rt=30000)
 removeOutliersContext <- function(df, min.rt, max.rt) {
   nrow.start <- nrow(df)  # store original size of df
-  df <- filter(df, ContextRT <= max.rt,
+  df <- filter(df,
+               ContextRT <= max.rt,
                ContextRT >= min.rt)
+  nrow.end <- nrow(df)  # store new size of df
+  printDataLoss(nrow.start, nrow.end)
+  df
+}
+
+
+#' Outlier removal: plausibility rating reaction times
+#'
+#' @param df A data frame
+#' @param method A string: "sd" or "threshold"
+#' @param min.rt An integer: minimum allowed reaction time
+#' @param max.rt An integer: maximum allowed reaction time
+#' @param sd An integer or float: sd value for sd-based exclusion
+#'
+#' @return A data frame without low/high rating reaction time trials
+#' @export
+#'
+#' @examples
+# 'removeOutliersRatings(ratings, method="sd", sd=2.5)
+# 'removeOutliersRatings(ratings, method="threshold", min.rt=300, max.rt=20000)
+removeOutliersRatings <- function(df,
+                                  method,
+                                  min.rt=100, max.rt=30000,
+                                  sd=2.5) {
+  nrow.start <- nrow(df)  # store original size of df
+  if (method == "threshold") {
+    df <- filter(df,
+                 DecisionRT <= max.rt,
+                 DecisionRT >= min.rt)
+  } else if (method == "sd") {
+    participant.SDs <- df %>% 
+      group_by(Subject) %>% 
+      summarize(SubjectSD = sd(DecisionRT),
+                SubjectMean = mean(DecisionRT))
+    df <- merge(df, participant.SDs, by="Subject", all=TRUE)
+    df <- filter(df,
+                 DecisionRT <= SubjectMean + sd*SubjectSD,
+                 DecisionRT >= SubjectMean - sd*SubjectSD)
+  } else {
+    stop("Please select a valid method (threshold or sd).")
+  }
   nrow.end <- nrow(df)  # store new size of df
   printDataLoss(nrow.start, nrow.end)
   df
