@@ -271,31 +271,29 @@ generatePlots <- function(model.output, model.name, model.type,
 #'
 #' @param df A data frame containing the model output 
 #' @param DV A character string: which version of the DV to use ("RT" or "logRT")
-#' @param plt.title A character string for the plot title 
 #' @param y.unit A character string: label of the y axis
 #' @param y.range A numeric vector: range for the y axis
 #'
-#' @return An individual ggplot2 plot
+#' @return A ggplot2 plot
 #' @export
 #'
 #' @examples
-plotSPR <- function(df, DV, plt.title, y.unit, y.range) {
+plotSPR <- function(df, DV, y.unit, y.range) {
   
   # Aggregate data 
-  cond.means <- aggMeansSE(df, c(DV, "Region", "Cond"))
-  y.var <- paste0("Mean", DV)
-  
+  cond.means <- aggregMeans(df, as.formula(get(DV) ~  Region + Cond))
+
   # Create plot
-  p <- cond.means %>% ggplot(aes(x = Region, y = get(y.var),
+  p <- cond.means %>% ggplot(aes(x = Region, y = Mean,
                                  color=Cond, group=Cond)) + 
     geom_point(size=2.5, shape="cross") + 
-    geom_line(linewidth=0.5) +
-    geom_errorbar(aes(ymin = get(y.var) - SE,
-                      ymax = get(y.var) + SE),
-                  width=0.1, linewidth=0.3) +
+    geom_line(linewidth=1) +
+    geom_errorbar(aes(ymin = Mean - SE,
+                      ymax = Mean + SE),
+                  width=0.1, linewidth=0.5) +
     ylim(y.range[1], y.range[2]) +
     ylab(y.unit) +
-    ggtitle(plt.title) +
+    #ggtitle(plt.title) +
     scale_color_manual("Condition",  # Legend title
                        values=c("cornflowerblue", "chartreuse3",
                                 "tomato2", "darkgoldenrod1")) +
