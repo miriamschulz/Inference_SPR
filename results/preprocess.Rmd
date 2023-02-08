@@ -62,7 +62,7 @@ df <- filter(df, !IPhash %in% exclude.participants)
 df.subjects <- data.frame(IPhash = unique(df$IPhash),
                           Subject = 1:length(unique(df$IPhash)))
 # use plyr::join instead of merge to preserve original row ordering:
-df <- plyr::join(df.subjects, df)
+df <- suppressMessages(plyr::join(df.subjects, df))
 ```
 
 Next, split the data into separate data frames for reading times and survey/demographics.
