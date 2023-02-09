@@ -226,7 +226,8 @@ runModels <- function(df, model.type, m.formula,
 #' @examples
 generatePlots <- function(model.output, model.name, model.type,
                           DV,
-                          y.unit, y.range,
+                          y.unit,
+                          y.range,
                           y.range.res, 
                           coef.plot = TRUE) {
   
@@ -283,21 +284,40 @@ plotSPR <- function(df, DV, y.unit, y.range) {
   # Aggregate data 
   cond.means <- aggregMeans(df, as.formula(get(DV) ~  Region + Cond))
 
+  pd <- position_dodge(0)  # set to 0 for no jitter/position dodge
+
   # Create plot
   p <- cond.means %>% ggplot(aes(x = Region, y = Mean,
-                                 color=Cond, group=Cond)) + 
-    geom_point(size=2.5, shape="cross") + 
-    geom_line(linewidth=1) +
+                                 color=Cond,
+                                 shape=Cond,
+                                 group=Cond,
+                                 )) + 
     geom_errorbar(aes(ymin = Mean - SE,
                       ymax = Mean + SE),
-                  width=0.1, linewidth=0.5) +
+                  width=1,
+                  linewidth=0.7,
+                  position = pd) +
+    geom_line(linewidth=1.5,
+              position = pd) +
+    geom_point(size=6,
+               #shape="cross",
+               #shape=19,
+               position = pd) + 
+    #geom_jitter(position = position_jitter(width = 0.2)) +
     ylim(y.range[1], y.range[2]) +
     ylab(y.unit) +
     #ggtitle(plt.title) +
     scale_color_manual("Condition",  # Legend title
                        values=c("cornflowerblue", "chartreuse3",
                                 "tomato2", "darkgoldenrod1")) +
-    theme_minimal()
+    #scale_shape_manual(values = c(19,17,15,18)) +
+    scale_shape_manual(values = rep("cross", times=4)) +
+    guides(shape=guide_legend(title="Condition"),
+           color=guide_legend(title="Condition"),
+           linetype=guide_legend(title="Condition")) +
+    theme_minimal() + 
+    theme(text = element_text(size = 25),
+          legend.key.width=unit(1,"cm"))
   
   # Add region labels if the regions range from precritical to post-spillover
   if (setequal(range(df$Region), c(-1, 2))) {
@@ -315,7 +335,7 @@ plotSPR <- function(df, DV, y.unit, y.range) {
   p
 }
 
-plotCoefs <- function(df, DV, plt.title, y.unit, y.range) {
+  plotCoefs <- function(df, DV, plt.title, y.unit, y.range) {
   
   # Reduce df to coefficient columns and Region
   df <- df %>% dplyr::select("Region", starts_with("Coef_"))
