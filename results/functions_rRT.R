@@ -54,8 +54,11 @@ modelAndPlot <- function(plt.name,
 #' @export
 #'
 #' @examples
-runModels <- function(df, model.type, m.formula,
-                      regions = -1:2, print.checks=FALSE) {
+runModels <- function(df,
+                      model.type,
+                      m.formula,
+                      regions = -1:2,
+                      print.checks=FALSE) {
   
   # Print chosen model type 
   model.types <- c("lm" = "simple LM",
@@ -69,7 +72,7 @@ runModels <- function(df, model.type, m.formula,
   # Order df by Region, then Subject (important for the final merging step)
   df <- filter(df, Region %in% regions) %>% arrange(Region, Subject)
   
-  # Extract dependent var
+  # Extract DV from formula
   DV <- m.formula[[2]]
   
   # Extract subjects 
@@ -224,7 +227,9 @@ runModels <- function(df, model.type, m.formula,
 #' @export
 #'
 #' @examples
-generatePlots <- function(model.output, model.name, model.type,
+generatePlots <- function(model.output,
+                          model.name,
+                          model.type,
                           DV,
                           y.unit,
                           y.range,
@@ -236,17 +241,21 @@ generatePlots <- function(model.output, model.name, model.type,
                    "lmer" = " (LMER)",
                    "lm.by.subj" = " (by-subject LMs)")
   model.name <- paste0(model.name, model.types[model.type])
+  filename <- paste0("./plots/", DV, "_", model.name, ".png")
   
   # Observed data
-  p.observed <- plotSPR(model.output, DV, "Observed RTs", y.unit, y.range)
+  p.observed <- plotSPR(model.output, DV, y.unit, y.range)
+  p.observed <- p.observed + ggtitle("Observed RTs")
   
   # Estimates
-  p.estimates <- plotSPR(model.output, "FittedValues", "Estimated RTs", 
+  p.estimates <- plotSPR(model.output, "FittedValues",
                          y.unit, y.range)
+  p.estimates <- p.estimates + ggtitle("Estimated RTs")
   
   # Residuals
-  p.residuals <- plotSPR(model.output, "Residuals", "Residuals", 
+  p.residuals <- plotSPR(model.output, "Residuals",
                          y.unit, y.range.res)
+  p.residuals <- p.residuals + ggtitle( "Residuals")
   
   # Coefficients
   if (coef.plot == TRUE) {
@@ -255,15 +264,16 @@ generatePlots <- function(model.output, model.name, model.type,
     # Combine into one plot
     p <- grid.arrange(p.observed, p.estimates, p.residuals, p.coefs, nrow=2,
                       top = textGrob(model.name, gp=gpar(fontsize=14)))  # fontface = 2
+    ggsave(filename, plot = p, width = 8, height = 6)
+    
   } else {
     # Combine into one plot
-    p <- grid.arrange(p.observed, p.estimates, p.residuals, nrow=2,
-                      top = textGrob(model.name, gp=gpar(fontsize=14)))  # fontface = 2
+    p <- grid.arrange(p.observed, p.estimates, p.residuals, nrow=1,
+                      top = textGrob(model.name, gp=gpar(fontsize=20)),
+                      padding=unit(2, "cm"))  # fontface = 2
+    # Save
+    ggsave(filename, plot = p, width = 9, height = 5)  # for 3 plots, excluding coef plot
   }
-  # Save
-  filename <- paste0("./plots/", DV, "_", model.name, ".png")
-  #ggsave(filename, plot = p, width = 12, height = 6)  # for 3 plots, excluding coef plot
-  ggsave(filename, plot = p, width = 8, height = 6)
   p
 }
 
@@ -287,41 +297,50 @@ plotSPR <- function(df, DV, y.unit, y.range) {
   pd <- position_dodge(0)  # set to 0 for no jitter/position dodge
 
   # Create plot
-  p <- cond.means %>% ggplot(aes(x = Region, y = Mean,
+  p <- cond.means %>% ggplot(aes(x = Region,
+                                 y = Mean,
                                  color=Cond,
-                                 shape=Cond,
+                                 #shape=Cond,
                                  group=Cond,
                                  )) + 
     geom_errorbar(aes(ymin = Mean - SE,
                       ymax = Mean + SE),
-                  width=1,
-                  linewidth=0.7,
+                  width=0.5,
+                  linewidth=0.3,
                   position = pd) +
-    geom_line(linewidth=1.5,
+    geom_line(linewidth=0.5,
               position = pd) +
-    geom_point(size=6,
-               #shape="cross",
-               #shape=19,
+    geom_point(size=3,
+               shape="cross",
                position = pd) + 
-    #geom_jitter(position = position_jitter(width = 0.2)) +
     ylim(y.range[1], y.range[2]) +
     ylab(y.unit) +
-    #ggtitle(plt.title) +
     scale_color_manual("Condition",  # Legend title
                        values=c("cornflowerblue", "chartreuse3",
                                 "tomato2", "darkgoldenrod1")) +
     #scale_shape_manual(values = c(19,17,15,18)) +
-    scale_shape_manual(values = rep("cross", times=4)) +
-    guides(shape=guide_legend(title="Condition"),
+    #scale_shape_manual(values = rep("cross", times=4)) +
+    guides(#shape=guide_legend(title="Condition"),
            color=guide_legend(title="Condition"),
            linetype=guide_legend(title="Condition")) +
     theme_minimal() + 
-    theme(text = element_text(size = 25),
-          legend.key.width=unit(1,"cm"))
+    theme(text = element_text(size = 11),
+          #legend.key.width=unit(1,"cm"),
+          #legend.key.size = unit(0.3, "cm"),
+          legend.title = element_text(size=5),
+          legend.text = element_text(size=5),
+          legend.position = "bottom",
+          plot.margin = unit(c(0,1,0,0), "cm"), # prevent x-axis text from being cut off at the right
+          panel.grid.minor.x = element_blank() # remove vertical lines between x ticks
+          #panel.grid.major = element_blank()
+          #panel.grid.major.x = element_line(color = "grey",
+          #                                  size = 0.5,
+          #                                  linetype = "dotted")
+          )
   
   # Add region labels if the regions range from precritical to post-spillover
   if (setequal(range(df$Region), c(-1, 2))) {
-    p <- p + scale_x_continuous(labels=c("-1" = "Precritical", 
+    p <- p + scale_x_continuous(labels=c("-1" = "Pre-critical", 
                                          "0" = "Critical",
                                          "1" = "Spillover", 
                                          "2" = "Post-spillover"))
@@ -335,7 +354,7 @@ plotSPR <- function(df, DV, y.unit, y.range) {
   p
 }
 
-  plotCoefs <- function(df, DV, plt.title, y.unit, y.range) {
+plotCoefs <- function(df, DV, plt.title, y.unit, y.range) {
   
   # Reduce df to coefficient columns and Region
   df <- df %>% dplyr::select("Region", starts_with("Coef_"))
