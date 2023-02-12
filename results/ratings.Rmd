@@ -1,0 +1,334 @@
+---
+title: "SPR results: Plausibility ratings"
+author: "Miriam Schulz"
+date: "9/15/2022"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, collapse = TRUE, fig.width=6, fig.height=5)
+```
+
+# About
+
+In this script:
+
+Analysis of the plausibility ratings data (the online task during the Self-Paced Reading experiment), split into:
+
+- Rating accuracy
+- Rating reaction times
+
+
+# Preprocessing
+
+```{r include = FALSE}
+# Workspace, libraries, functions
+rm(list = ls())       # clear workspace (optional)
+library(tidyverse)
+library(MASS)         # for boxcox function 
+library(grid)         # for textGrob()
+library(gridExtra)    # for grid.arrange
+source("functions.R") # custom functions 
+```
+
+Read in data and filter to a single region for the reaction time analysis:
+
+```{r}
+df <- read.csv("results_reads.csv")
+ratings <- removeRegions(df, keep.regions=0)
+```
+
+The range of the reaction times above shows that no extreme outliers need to be removed before proceeding.
+
+With respect to the accuracy, this script revealed that three items have low accuracy in the B condition, suggesting that the inference is weaker in these items, even though they passed the criteria for the pretests.
+In order to run this script without these items and compare results, uncomment the following line:
+
+```{r}
+#ratings <- filter(ratings, !Item %in% c(5, 13, 25))
+```
+
+
+# Rating accuracy
+
+## Grand mean and sd
+
+```{r}
+meanRound(ratings$RatingCorrect, 2)
+meanRound(sd(ratings$RatingCorrect))
+```
+
+## Accuracy by subject
+
+```{r}
+subj.accs <- aggregMeans(ratings, as.formula(RatingCorrect ~ Subject),
+                         round.data=TRUE)
+
+# All subject accuracies:
+subj.accs
+
+# Range, mean, SD:
+round(range(subj.accs$Mean), 2)
+meanRound(subj.accs$Mean)
+meanRound(sd(subj.accs$Mean))
+```
+
+## Accuracy by condition
+
+```{r}
+cond.accs <- aggregMeans(ratings, as.formula(RatingCorrect ~ Cond), 
+                         round.data=TRUE)
+
+# By-condition accuracy and SD:
+cond.accs
+
+# Range:
+round(range(cond.accs$Mean), 2)
+```
+
+## Accuracy by item
+
+Check if some particular items or fillers had low overall accuracy ($< 0.7$)
+
+```{r}
+item.accs <- aggregMeans(ratings, as.formula(RatingCorrect ~ Item), 
+                         round.data=TRUE)
+range(item.accs$Mean)
+# Print problematic items with low overall accuracy:
+filter(item.accs, Mean < 0.7)
+# Range of overall accuracy for the experimental items only (no fillers):
+range(filter(item.accs, Item < 100)$Mean)
+```
+
+**Note:** Low mean accuracy items (mean accuracy $< 0.7$) are all fillers, no experimental item is concerned.
+
+## Accuracy by item + condition (experimental items only)
+
+```{r}
+ratings.items <- removeFillersPractice(ratings)
+item.cond.accs <- aggregMeans(ratings.items,
+                              as.formula(RatingCorrect ~ Item + Cond), 
+                         round.data=TRUE)
+range(item.cond.accs$Mean)
+
+item.cond.accs <- dplyr::select(item.cond.accs, Cond, Item, Mean)
+item.cond.accs <- item.cond.accs %>% 
+  spread(Cond, Mean)
+item.cond.accs <- merge(item.cond.accs, item.accs)
+item.cond.accs
+item.cond.accs <- item.cond.accs[, 1:6]
+
+# Print any items that had accuracy < 70% for any individual condition:
+item.cond.accs %>% filter_all(any_vars(. < 0.7))
+```
+
+**Note:** 3 experimental items have low accuracy in one condition (always in Condition B).
+
+## Plot: Accuracy by condition
+
+```{r echo=FALSE, fig.width=5, fig.height=4}
+p <- cond.accs %>% 
+  ggplot(aes(x = Cond, y = Mean, fill=Cond)) + 
+  geom_bar(stat = "identity",
+           width=0.8) +
+  geom_errorbar(
+    aes(ymin = Mean - SE, ymax = Mean + SE),
+    width = 0.15,
+    linewidth = 0.3
+  ) +
+  xlab("Condition") +
+  ylab("Accuracy (%)") +
+  #ggtitle("Mean rating accuracy per condition (error bars = 1 SE)") +
+  scale_fill_manual(values = c("cornflowerblue", "chartreuse3",
+                                "tomato2", "darkgoldenrod1",
+                                "gray85","gray75")) +
+  scale_x_discrete(labels=c("A", "B", "C", "D",
+                            "Plausible\nfillers", "Implausible\nfillers")) +
+  theme_minimal() + 
+  theme(legend.position = "none",
+        text = element_text(size = 13))
+filename <- paste0("./plots/", "rating_accs.pdf")
+ggsave(filename, plot = p, width = 5, height = 4)
+p + ggtitle("Mean rating accuracy per condition")
+```
+
+
+# Rating reaction times
+
+## Mean and SD before outlier removal
+
+```{r}
+# Decision Reaction Times
+round(mean(ratings$DecisionRT))
+round(sd(ratings$DecisionRT))
+range(ratings$DecisionRT)
+```
+
+
+## Remove outliers 
+
+First, inspect the histograms and QQ plots of the reaction times to visually check for outliers:
+
+```{r echo=FALSE, fig.width=10, fig.height=5}
+par(mfrow=c(1,2))
+
+# Histogram of RTs:
+hist(ratings$DecisionRT,
+     breaks = 50,
+     col='steelblue',
+     main='Raw rating decision times')
+
+# Histogram of log RTs:
+hist(log(ratings$DecisionRT),
+     breaks = 50,
+     col='steelblue',
+     main='Log-transformed rating decision times')
+
+# QQ plots
+
+# Untransformed RTs
+qqnorm(ratings$DecisionRT,
+       col='steelblue',
+       pch=16,
+       main='QQ plot of raw decision times')
+
+# Log-transformed RTs
+qqnorm(log(ratings$DecisionRT),
+       col='steelblue',
+       pch=16,
+       main='QQ plot of log-transformed decision times')
+par(mfrow=c(1,1))  # reset
+```
+
+The QQ plots show the presence of outliers. 
+Therefore, rating reaction times were filtered to lie within $\pm 2.5$ standard deviations from the by-participant mean, resulting in the loss of $3.34\%$ of the data:
+
+```{r}
+ratings <- removeOutliersRatings(ratings,
+                                 method="sd",
+                                 sd=2.5)
+```
+
+Check the plots again after removing outliers:
+
+```{r echo=FALSE, fig.width=10, fig.height=5}
+par(mfrow=c(1,2))
+# Histogram of RTs:
+hist(ratings$DecisionRT,
+     breaks = 50,
+     col='steelblue',
+     main='Raw rating decision times')
+
+# Histogram of log RTs:
+hist(log(ratings$DecisionRT),
+     breaks = 50,
+     col='steelblue',
+     main='Log-transformed rating decision times')
+
+# QQ plots
+# Untransformed RTs
+qqnorm(ratings$DecisionRT,
+       col='steelblue',
+       pch=16,
+       main='QQ plot of raw decision times')
+
+# Log-transformed RTs
+qqnorm(log(ratings$DecisionRT),
+       col='steelblue',
+       pch=16,
+       main='QQ plot of log-transformed decision times')
+par(mfrow=c(1,1))  # reset
+```
+
+## Mean and SD after outlier removal
+
+```{r}
+# Decision Reaction Times
+round(mean(ratings$DecisionRT))
+round(sd(ratings$DecisionRT))
+range(ratings$DecisionRT)
+```
+
+## Reaction time by condition
+
+```{r}
+# Mean and SE of ratings, outliers removed
+rating.cond.means <- aggregMeans(ratings,
+                                 as.formula(DecisionRT ~ Cond)) %>%
+  mutate_if(is.numeric, round)
+rating.cond.means
+```
+
+## Plot: Reaction times by condition
+
+```{r echo=FALSE, fig.width=5, fig.height=4}
+# As barplot:
+p <- rating.cond.means %>% 
+  ggplot(aes(x = Cond, y = Mean, fill = Cond)) + 
+  geom_bar(stat = "identity",
+           width=0.8) +
+  geom_errorbar(
+    aes(ymin = Mean - SE, ymax = Mean + SE),
+    width = 0.15,
+    linewidth = 0.3
+  ) +
+  xlab("Condition") +
+  ylab("Reaction time (ms)") +
+  scale_fill_manual(values = c("cornflowerblue", "chartreuse3",
+                                "tomato2", "darkgoldenrod1",
+                                "gray85","gray75")) +
+  scale_x_discrete(labels=c("A", "B", "C", "D",
+                            "Plausible\nfillers", "Implausible\nfillers")) +
+  theme_minimal() + 
+  theme(legend.position = "none",
+        text = element_text(size = 13))
+filename <- paste0("./plots/", "rating_RT.pdf")
+ggsave(filename, plot = p, width = 5, height = 4)
+p + ggtitle("Mean rating RT per condition")
+```
+
+
+```{r include=FALSE, fig.width=10, fig.height=4}
+#As boxplots (show outliers):
+
+p1 <- ratings %>% 
+  ggplot(aes(x = Cond, y = DecisionRT, fill=Cond)) + 
+  geom_boxplot() + 
+  xlab("Condition") +
+  ylab("Reaction time (ms)") +
+  scale_fill_manual(values = c("cornflowerblue", "chartreuse3",
+                                "tomato2", "darkgoldenrod1",
+                                "gray85","gray75")) +
+  scale_x_discrete(labels=c("A", "B", "C", "D",
+                            "Plausible\nfillers", "Implausible\nfillers")) +
+  theme_minimal() +
+  theme(legend.position="None",
+        text = element_text(size = 13))
+filename <- paste0("./plots/", "rating_RT_boxplot.pdf")
+ggsave(filename, plot = p1, width = 5, height = 4)
+#p1 + ggtitle("Rating reaction time by condition")
+
+p2 <- ratings %>% 
+  ggplot(aes(x = Cond, y = log(DecisionRT), fill=Cond)) + 
+  geom_boxplot() + 
+  xlab("Condition") +
+  ylab("Reaction time (ms)") +
+  scale_fill_manual(values = c("cornflowerblue", "chartreuse3",
+                                "tomato2", "darkgoldenrod1",
+                                "gray85","gray75")) +
+  scale_x_discrete(labels=c("A", "B", "C", "D",
+                            "Plausible\nfillers", "Implausible\nfillers")) +
+  theme_minimal() +
+  theme(legend.position="None",
+        text = element_text(size = 13))
+filename <- paste0("./plots/", "rating_RT_boxplot_log.pdf")
+ggsave(filename, plot = p2, width = 5, height = 4)
+#p2 + ggtitle("Rating reaction time by condition (log-transformed)")
+
+grid.arrange(p1, p2,
+             ncol=2,
+             top = textGrob("Reaction times by condition (left: untransformed, right: log-transformed)",
+             gp=gpar(fontsize=18, fontface=2)))
+```
