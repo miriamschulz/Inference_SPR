@@ -344,7 +344,11 @@ plotSPR <- function(df, DV, y.unit, y.range) {
                                          "0" = "Critical",
                                          "1" = "Spillover", 
                                          "2" = "Post-spillover"))
-  }
+  } #else if (setequal(range(df$Region), c(0, 2))) {
+   # p <- p + scale_x_continuous(labels=c("0" = "Critical",
+   #                                      "1" = "Spillover", 
+   #                                      "2" = "Post-spillover"))
+  #}
   
   # Add horizontal line for residual plot
   if (DV == "Residuals") {
@@ -407,4 +411,63 @@ plotCoefs <- function(df, DV, plt.title, y.unit, y.range) {
   }
   
   p
+}
+
+
+#' Compare residual plots for different predictor transformations
+#'
+#' @param df A data frame: possibly subset of the experimental conditions
+#' @param var.untransformed A string: name of the first predictor column
+#' @param var.log A string: name of the second predictor column
+#'
+#' @return A grid.arrange plot
+#' @export
+#'
+#' @examples
+#' compareLogToUntransformed(df.CD, "Association", "logAssociation")
+compareLogToUntransformed <- function(df, var.untransformed, var.log) {
+  f1 <- as.formula(get(DV) ~ 1 + get(var.untransformed) + (1|Subject) + (1|Item))
+  f2 <- as.formula(get(DV) ~ 1 + get(var.log) + (1|Subject) + (1|Item))
+  df.m1 <- runModels(df, model.type="lmer", f1)
+  df.m2 <- runModels(df, model.type="lmer", f2)
+  p1 <- plotSPR(df.m1, "Residuals", y.unit, c(-0.05, 0.05)) + ggtitle(var.untransformed)
+  p2 <- plotSPR(df.m2, "Residuals", y.unit, c(-0.05, 0.05)) + ggtitle(var.log)
+  p <- grid.arrange(p1, p2, nrow=1,
+                    top = textGrob(paste0("Comparing residuals for ",
+                                          var.untransformed,
+                                          " to ",
+                                          var.log),
+                                   gp=gpar(fontsize=14, fontface=2)))
+  ggsave(paste0("./plots/residual_comparison_", var.untransformed, "_",
+                var.log, ".pdf"), p, dpi = 300)
+  p
+}
+
+
+#' Calculate the mean AIC or BIC score across different regions
+#'
+#' @param df A data frame
+#' @param f A model formula
+#' @param measure A string: either "AIC" or "BIC"
+#' @param regions A mumeric vector: regions to use
+#'
+#' @return
+#' @export
+#'
+#' @examples 
+#' getMeanAICBIC(df, as.formula(logRT ~ Inference + (1|Subject) + (1|Item)), "AIC")
+getMeanAICBIC <- function(df, f, measure, regions=-1:2) {
+  if (!measure %in% c("AIC", "BIC")) {
+    stop("Please choose a valid measure (AIC or BIC")
+  }
+  scores <- c()  # init
+  for (r in regions) {
+    df.region <- filter(df, Region==r)
+    if (measure == "AIC") {
+      scores <- c(scores, AIC(lmer(f, data=df.region)))
+    } else {
+      scores <- c(scores, BIC(lmer(f, data=df.region)))
+    }
+  }
+  mean(scores)  # return the mean across regions
 }
