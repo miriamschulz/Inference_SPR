@@ -67,7 +67,7 @@ runModels <- function(df,
   if (!model.type %in% names(model.types)) {
     stop("Please specify a model type from the following options: lm, lm.by.subj, lmer")
   }
-  print(paste0("Chosen model: ", model.types[model.type]))
+  cat(paste0("Chosen model: ", model.types[model.type]))
   
   # Order df by Region, then Subject (important for the final merging step)
   df <- filter(df, Region %in% regions) %>% arrange(Region, Subject)
@@ -84,7 +84,7 @@ runModels <- function(df,
   # Loop over the regions and run one model per region 
   for (region in regions) {
     
-    print(paste0("Processing region: ", region))
+    #print(paste0("Processing region: ", region))
     df.region <- filter(df, Region == region)
     
     # Run model and extract residuals, fitted values, and model coefficients
@@ -132,7 +132,7 @@ runModels <- function(df,
       output.region <- cbind(output.region, original.region)
       
       # Step 2: Coefficients 
-      m.coefs <- fixef(m.region)      # extract coefficients 
+      m.coefs <- fixef(m.region)  # extract coefficients 
       for (i in 1:length(names(m.coefs))) {
         term <- names(m.coefs)[[i]]
         term <- paste("Coef", term, sep = "_")
@@ -272,7 +272,7 @@ generatePlots <- function(model.output,
                       top = textGrob(model.name, gp=gpar(fontsize=20)),
                       padding=unit(2, "cm"))  # fontface = 2
     # Save
-    ggsave(filename, plot = p, width = 9, height = 5)  # for 3 plots, excluding coef plot
+    ggsave(filename, plot = p, width = 12, height = 5)  # for 3 plots, excluding coef plot
   }
   p
 }
@@ -292,7 +292,7 @@ generatePlots <- function(model.output,
 plotSPR <- function(df, DV, y.unit, y.range) {
   
   # Aggregate data 
-  cond.means <- aggregMeans(df, as.formula(get(DV) ~  Region + Cond))
+  cond.means <- aggregMeans(df, as.formula(get(DV) ~ Region + Cond))
 
   pd <- position_dodge(0)  # set to 0 for no jitter/position dodge
 
@@ -375,7 +375,8 @@ plotCoefs <- function(df, DV, plt.title, y.unit, y.range) {
   df <- df %>% gather(Coefficient, Estimate, -c(Region))
   
   # Aggregate data 
-  coef.means <- aggMeansSE(df, c("Estimate", "Coefficient", "Region"))
+  #coef.means <- aggMeansSE(df, c("Estimate", "Coefficient", "Region"))
+  coef.means <- aggregMeans(df, as.formula(Estimate ~ Coefficient + Region))
   print(coef.means)
   
   # Manual color palette 

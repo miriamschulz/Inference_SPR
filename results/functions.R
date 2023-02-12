@@ -491,10 +491,6 @@ removeOutliersSPR <- function(df,
       summarize(SubjectMean = mean(RT),
                 SubjectSD = sd(RT))
       df <- merge(df, participant.SDs, by="Subject", all=TRUE)
-      #df$ExcludeTrial <- ifelse((df$RT > df$SubjectMean + sd.value*df$SubjectSD | 
-      #                             df$RT < df$SubjectMean - sd.value*df$SubjectSD),
-      #                          "yes",
-      #                          "no")
       
       df$UpperBound <- df$SubjectMean + sd.value*df$SubjectSD
       df$LowerBound <- df$SubjectMean - sd.value*df$SubjectSD
@@ -522,7 +518,7 @@ removeOutliersSPR <- function(df,
     df.mini <- dplyr::select(df, Item, Cond, Subject)
     for (r in 1:nrow(df.mini)) {
       row <- df.mini[r, ]
-      match.found <- nrow(suppressMessages(plyr::match_df(df.exclude.mini, row)))
+      match.found <- nrow(suppressMessages(plyr::match_df(df.exclude.mini,row)))
       # Update the trial exclusion marking
       if (match.found > 0) {
         df[r, "ExcludeTrial"] <- "yes"
