@@ -472,8 +472,7 @@ plotEffects <- function(df) {
   SEs <- df %>% dplyr::select("Region",
                                 starts_with("SE_")) %>% unique()
   pvals <- df %>% dplyr::select("Region",
-                                starts_with("PVALUE_")) %>% unique() #%>% 
-    #mutate_if(is.numeric, is.significant)
+                                starts_with("PVALUE_")) %>% unique()
 
   # Get all coefficient column names; remove the "ZSCORE_" prefix 
   zscores.colnames <- str_remove(names(zscores), "ZSCORE_")
@@ -605,20 +604,4 @@ getMeanAICBIC <- function(df, f, measure, regions=-1:2) {
     }
   }
   mean(scores)  # return the mean across regions
-}
-
-
-#' Transform a list of p-values to categorical factor: ns or p<0.05
-#'
-#' @param x A numeric vector of p-values
-#'
-#' @return A factor with levels = c(ns, p<0.05)
-#' @export
-#'
-#' @examples
-#' is.significant(x = c(0.05, 1, 0.01, 0.04))
-is.significant <- function(x) {
-  y <- ifelse(x < 0.05, "p<0.05", "ns")
-  y <- factor(y, levels=c("ns", "p<0.05"))
-  y
 }
