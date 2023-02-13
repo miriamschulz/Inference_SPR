@@ -34,7 +34,7 @@ modelAndPlot <- function(plt.name,
   
   # Run a model for each region
   m <- runModels(df, m.type, m.formula, regions = regions)
-  
+
   # Generate plots
   p <- generatePlots(m, plt.name, m.type,
                      DV, y.unit, y.range, y.range.res,
@@ -101,7 +101,7 @@ runModels <- function(df,
       colnames(original.region) <- paste0("Model_", colnames(original.region))
       output.region <- cbind(output.region, original.region)
       
-      # Step 2: Coefficients 
+      # Step 2: Coefficients
       m.coefs <- tidy(m.region)      # extract coefficients 
       for (r in 1:nrow(m.coefs)) {
         term <- m.coefs[r, "term"][[1]]
@@ -121,7 +121,7 @@ runModels <- function(df,
       
       ### LMER
       m.region <- lmer(m.formula, data = df.region)
-      
+
       # 1.1 Residuals + fitted values
       output.region <- cbind(data.frame(Residuals = residuals(m.region),
                                         FittedValues = fitted.values(m.region)))
@@ -131,13 +131,26 @@ runModels <- function(df,
       colnames(original.region) <- paste0("Model_", colnames(original.region))
       output.region <- cbind(output.region, original.region)
       
-      # Step 2: Coefficients 
-      m.coefs <- fixef(m.region)  # extract coefficients 
+      # Step 2: Coefficients  + coefficient SE
+      m.coefs <- fixef(m.region)          # extract coefficients 
+      m.se <- sqrt(diag(vcov(m.region)))  # extract SE for each coefficient
+      m.p <- anova(m.region)[6]$`Pr(>F)`  # extract p-value for each coefficient
       for (i in 1:length(names(m.coefs))) {
         term <- names(m.coefs)[[i]]
-        term <- paste("Coef", term, sep = "_")
+        term.coef <- paste("Coef", term, sep = "_")
+        term.se <- paste("SE", term, sep = "_")
+        term.zscore <- paste("ZSCORE", term, sep = "_")
+        term.pvalue <- paste("PVALUE", term, sep = "_")
         estimate <- m.coefs[[i]]
-        output.region[, term] <- estimate
+        se <- m.se[[i]]
+        output.region[, term.coef] <- estimate
+        output.region[, term.se] <- se
+        output.region[, term.zscore] <- estimate / se
+        # Append p-value only if term is not intercept:
+        #if ((i < length(names(m.coefs))+1) & !term == "(Intercept)") {
+        if (!term == "(Intercept)") {
+          output.region[, term.pvalue] <- m.p[[i-1]]
+        }
       }
       
       # Bind to original df (or create)
@@ -260,7 +273,7 @@ generatePlots <- function(model.output,
   # Coefficients
   if (coef.plot == TRUE) {
     # Generate coefficient plot 
-    p.coefs <- plotCoefs(model.output, DV, "Coefficients", y.unit, y.range)
+    p.coefs <- plotCoefs(model.output)
     # Combine into one plot
     p <- grid.arrange(p.observed, p.estimates, p.residuals, p.coefs, nrow=2,
                       top = textGrob(model.name, gp=gpar(fontsize=14)))  # fontface = 2
@@ -316,10 +329,11 @@ plotSPR <- function(df, DV, y.unit, y.range) {
     ylim(y.range[1], y.range[2]) +
     ylab(y.unit) +
     scale_color_manual("Condition",  # Legend title
-                       values=c("cornflowerblue", "chartreuse3",
-                                "tomato2", "darkgoldenrod1")) +
+                       values=c("A" = "cornflowerblue",
+                                "B"= "chartreuse3",
+                                "C"= "tomato2",
+                                "D"= "darkgoldenrod1")) +
     #scale_shape_manual(values = c(19,17,15,18)) +
-    #scale_shape_manual(values = rep("cross", times=4)) +
     guides(#shape=guide_legend(title="Condition"),
            color=guide_legend(title="Condition"),
            linetype=guide_legend(title="Condition")) +
@@ -327,8 +341,8 @@ plotSPR <- function(df, DV, y.unit, y.range) {
     theme(text = element_text(size = 11),
           #legend.key.width=unit(1,"cm"),
           #legend.key.size = unit(0.3, "cm"),
-          legend.title = element_text(size=5),
-          legend.text = element_text(size=5),
+          legend.title = element_text(size=7),
+          legend.text = element_text(size=7),
           legend.position = "bottom",
           plot.margin = unit(c(0,1,0,0), "cm"), # prevent x-axis text from being cut off at the right
           panel.grid.minor.x = element_blank() # remove vertical lines between x ticks
@@ -344,11 +358,12 @@ plotSPR <- function(df, DV, y.unit, y.range) {
                                          "0" = "Critical",
                                          "1" = "Spillover", 
                                          "2" = "Post-spillover"))
-  } #else if (setequal(range(df$Region), c(0, 2))) {
-   # p <- p + scale_x_continuous(labels=c("0" = "Critical",
-   #                                      "1" = "Spillover", 
-   #                                      "2" = "Post-spillover"))
-  #}
+  } else if (setequal(range(df$Region), c(0, 2))) {
+    p <- p + scale_x_continuous(breaks=seq(0,2,1),
+                                labels = c("0" = "Critical",
+                                           "1" = "Spillover",
+                                           "2" = "Post-spillover"))
+  }
   
   # Add horizontal line for residual plot
   if (DV == "Residuals") {
@@ -358,16 +373,30 @@ plotSPR <- function(df, DV, y.unit, y.range) {
   p
 }
 
-plotCoefs <- function(df, DV, plt.title, y.unit, y.range) {
-  
+
+#' Plot coefficients
+#'
+#' @param df A data frame: model output, containing coefficient estimates
+#'
+#' @return
+#' @export
+#'
+#' @examples
+#' plotCoefs(model.output)
+plotCoefs <- function(df) {
+
+  # SE
+  SEs <- df %>% dplyr::select("Region", starts_with("SE_")) %>% unique()
+
   # Reduce df to coefficient columns and Region
-  df <- df %>% dplyr::select("Region", starts_with("Coef_"))
-  df <- unique(df)
-  
+  df <- df %>% dplyr::select("Region", starts_with("Coef_")) %>% unique()
+
   # Get all coefficient column names; remove the "Coef_" prefix 
   coef_colnames <- str_remove(names(df), "Coef_")
   names(df) <- coef_colnames
-  
+  SEs.colnames <- str_remove(names(SEs), "SE_")
+  names(SEs) <- SEs.colnames
+
   # Add the intercept to each coefficient estimate (except in the intercept only case)
   if (length(coef_colnames) > 2) {
     for (colname in coef_colnames[3:length(coef_colnames)]) {
@@ -377,28 +406,38 @@ plotCoefs <- function(df, DV, plt.title, y.unit, y.range) {
   
   # Transform from wide to long format, keeping the Region column
   df <- df %>% gather(Coefficient, Estimate, -c(Region))
-  
-  # Aggregate data 
-  #coef.means <- aggMeansSE(df, c("Estimate", "Coefficient", "Region"))
-  coef.means <- aggregMeans(df, as.formula(Estimate ~ Coefficient + Region))
-  print(coef.means)
-  
+
+  SEs <- SEs %>% gather(Coefficient, Estimate, -c(Region)) %>%
+    rename(SE = Estimate)
+  coef.means <- merge(df, SEs, by=c("Region", "Coefficient"))
+
+    # Aggregate data 
+  #coef.means <- aggregMeans(df, as.formula(Estimate ~ Coefficient + Region))
+  #print(coef.means)
+
   # Manual color palette 
+  #coef_plot_colors <- c("#222222",  # black for the intercept
+  #                      brewer.pal(n=max(3, length(unique(df$Coefficient))),
+  #                                 "Pastel2"))[1:length(unique(df$Coefficient))]
   coef_plot_colors <- c("#222222",  # black for the intercept
-                        brewer.pal(n=max(3, length(unique(df$Coefficient))),
-                                   "Pastel2"))[1:length(unique(df$Coefficient))]
+                        "deeppink2", "purple3", "cyan2",
+                        "lightseagreen", "plum2", "powderblue",
+                        "rosybrown1", "darkolivegreen1", "aquamarine",
+                        "cadetblue1"
+                        )[1:length(unique(df$Coefficient))]
   
   # Generate plot
-  p <- coef.means %>% ggplot(aes(x = Region, y=MeanEstimate,
-                                 color = Coefficient, group = Coefficient)) + 
+  p <- coef.means %>%
+    ggplot(aes(x = Region, y=Estimate,
+               color = Coefficient, group = Coefficient)) + 
     geom_point(size=2.5, shape="cross") + 
     geom_line(linewidth=0.5) +
-    geom_errorbar(aes(ymin = MeanEstimate - SE,
-                      ymax = MeanEstimate + SE),
+    geom_errorbar(aes(ymin = Estimate - SE,
+                      ymax = Estimate + SE),
                   width=0.1, linewidth=0.3) +
     #ylim(y.range[1], y.range[2]) +  # remove ylim for coef plots!
-    ylab(y.unit) +
-    ggtitle(plt.title) +
+    ylab("Model coefficient") +
+    ggtitle("Coefficients") +
     scale_color_manual(values = coef_plot_colors) + 
     theme_minimal()
   
@@ -408,8 +447,97 @@ plotCoefs <- function(df, DV, plt.title, y.unit, y.range) {
                                          "0" = "Critical",
                                          "1" = "Spillover", 
                                          "2" = "Post-spillover"))
-  }
+   } else if (setequal(range(df$Region), c(0, 2))) {
+     p <- p + scale_x_continuous(breaks=seq(0,2,1),
+                                 labels = c("0" = "Critical",
+                                            "1" = "Spillover",
+                                            "2" = "Post-spillover"))
+   }
+  p
+}
+
+
+#' Plot SPR effect size + pvalue
+#'
+#' @param df A data frame: model output, containing coefficient estimates, SE, Zscore and Pvalue
+#'
+#' @return
+#' @export
+#'
+#' @examples
+plotEffects <- function(df) {
+  # Reduce df to effect columns and Region
+  zscores <- df %>% dplyr::select("Region",
+                                  starts_with("ZSCORE_")) %>% unique()
+  SEs <- df %>% dplyr::select("Region",
+                                starts_with("SE_")) %>% unique()
+  pvals <- df %>% dplyr::select("Region",
+                                starts_with("PVALUE_")) %>% unique() #%>% 
+    #mutate_if(is.numeric, is.significant)
+
+  # Get all coefficient column names; remove the "ZSCORE_" prefix 
+  zscores.colnames <- str_remove(names(zscores), "ZSCORE_")
+  names(zscores) <- zscores.colnames
+  # Get all coefficient column names; remove the "SE_" prefix 
+  SEs.colnames <- str_remove(names(SEs), "SE_")
+  names(SEs) <- SEs.colnames
+  # Get all pvalue column names; remove the "PVALUE_" prefix 
+  pvals.colnames <- str_remove(names(pvals), "PVALUE_")
+  names(pvals) <- pvals.colnames
   
+  # Transform from wide to long format, keeping the Region column
+  zscores <- zscores %>% gather(Coefficient, Estimate, -c(Region)) %>%
+    rename(Zscore = Estimate)
+  SEs <- SEs %>% gather(Coefficient, Estimate, -c(Region)) %>%
+    rename(SE = Estimate)
+  pvals <- pvals %>% gather(Coefficient, Estimate, -c(Region)) %>% 
+    rename(Pvalue = Estimate)
+  
+  # Remove intercept from zscores+SE
+  zscores <- zscores %>%
+    filter(Region != "(Intercept)") 
+  SEs <- SEs %>%
+    filter(Region != "(Intercept)") 
+  
+  df <- merge(zscores, SEs, by=c("Region", "Coefficient"))
+  df <- merge(df, pvals, by=c("Region", "Coefficient"))
+  df$Significant <- factor(ifelse(df$Pvalue < 0.05, "p<0.05", "ns"))
+
+  effect_plot_colors <- c("deeppink2", "purple3", "cyan2",
+                          "lightseagreen", "plum2", "powderblue",
+                          "rosybrown1", "darkolivegreen1", "aquamarine", 
+                          "cadetblue1"
+  )[1:length(unique(df$Coefficient))]
+  
+  # Generate plot
+  p <- df %>%
+    ggplot(aes(x = Region,
+               y=Zscore,
+               color = Coefficient,
+               group = Coefficient,
+               shape = Significant)) + 
+    #geom_point(size=2.5, shape="cross") + 
+    geom_point(size=2.5) + 
+    geom_line(linewidth=0.5) +
+    ylab("Z score") +
+    ggtitle("Effect size") +
+    scale_color_manual(values = effect_plot_colors) + 
+    scale_shape_manual(values = c(1, 8)) +  # shapes for the p-values
+    geom_hline(yintercept=0, linetype="dashed") +
+    theme_minimal()
+  
+  # Add region labels if the regions range from precritical to post-spillover
+  if (setequal(range(df$Region), c(-1, 2))) {
+    p <- p + scale_x_continuous(labels=c("-1" = "Precritical", 
+                                         "0" = "Critical",
+                                         "1" = "Spillover", 
+                                         "2" = "Post-spillover"))
+  } else if (setequal(range(df$Region), c(0, 2))) {
+    p <- p + scale_x_continuous(breaks=seq(0,2,1),
+                                labels = c("0" = "Critical",
+                                           "1" = "Spillover",
+                                           "2" = "Post-spillover"))
+  }
   p
 }
 
@@ -425,22 +553,25 @@ plotCoefs <- function(df, DV, plt.title, y.unit, y.range) {
 #'
 #' @examples
 #' compareLogToUntransformed(df.CD, "Association", "logAssociation")
-compareLogToUntransformed <- function(df, var.untransformed, var.log) {
+compareLogToUntransformed <- function(df,
+                                      var.untransformed,
+                                      var.log,
+                                      y.range.res=c(-0.055, 0.055)) {
   f1 <- as.formula(get(DV) ~ 1 + get(var.untransformed) + (1|Subject) + (1|Item))
   f2 <- as.formula(get(DV) ~ 1 + get(var.log) + (1|Subject) + (1|Item))
   df.m1 <- runModels(df, model.type="lmer", f1)
   df.m2 <- runModels(df, model.type="lmer", f2)
-  p1 <- plotSPR(df.m1, "Residuals", y.unit, c(-0.05, 0.05)) + ggtitle(var.untransformed)
-  p2 <- plotSPR(df.m2, "Residuals", y.unit, c(-0.05, 0.05)) + ggtitle(var.log)
+  p1 <- plotSPR(df.m1, "Residuals", y.unit, y.range.res) + ggtitle(var.untransformed)
+  p2 <- plotSPR(df.m2, "Residuals", y.unit, y.range.res) + ggtitle(var.log)
   p <- grid.arrange(p1, p2, nrow=1,
                     top = textGrob(paste0("Comparing residuals for ",
                                           var.untransformed,
                                           " to ",
                                           var.log),
                                    gp=gpar(fontsize=14, fontface=2)))
-  ggsave(paste0("./plots/residual_comparison_", var.untransformed, "_",
-                var.log, ".pdf"), p, dpi = 300)
-  p
+  suppressMessages(ggsave(paste0("./plots/residual_comparison_", var.untransformed, "_",
+                var.log, ".pdf"), p, dpi = 300))
+  #p
 }
 
 
@@ -464,10 +595,30 @@ getMeanAICBIC <- function(df, f, measure, regions=-1:2) {
   for (r in regions) {
     df.region <- filter(df, Region==r)
     if (measure == "AIC") {
-      scores <- c(scores, AIC(lmer(f, data=df.region)))
+      aic <- AIC(lmer(f, data=df.region))
+      print(paste0("AIC: ", aic))
+      scores <- c(scores, aic)
     } else {
-      scores <- c(scores, BIC(lmer(f, data=df.region)))
+      bic <- BIC(lmer(f, data=df.region))
+      print(paste0("BIC: ", bic))
+      scores <- c(scores, bic)
     }
   }
   mean(scores)  # return the mean across regions
+}
+
+
+#' Transform a list of p-values to categorical factor: ns or p<0.05
+#'
+#' @param x A numeric vector of p-values
+#'
+#' @return A factor with levels = c(ns, p<0.05)
+#' @export
+#'
+#' @examples
+#' is.significant(x = c(0.05, 1, 0.01, 0.04))
+is.significant <- function(x) {
+  y <- ifelse(x < 0.05, "p<0.05", "ns")
+  y <- factor(y, levels=c("ns", "p<0.05"))
+  y
 }
