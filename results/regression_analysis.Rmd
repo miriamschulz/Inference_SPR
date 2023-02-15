@@ -267,24 +267,22 @@ df.precrit1 <- filter(df, Region == -1) %>%
   rename(RT_precrit1 = RT)
 df <- merge(df, df.precrit1, by = c("Item", "Cond", "Subject"))
 
-# Extract precritical RT -2 and add to df:
-#df.precrit2 <- filter(df, Region == -2) %>% 
-#  dplyr::select(Item, Cond, Subject, RT) %>% 
-#  rename(RT_precrit2 = RT)
-#df <- merge(df, df.precrit2, by = c("Item", "Cond", "Subject"))
-
 # Add target length 
 df <- df %>% mutate(Length = nchar(Target))
 
 # Add log-transformed variables (DV + IVs)
 df$logRT <- log(df$RT)
 df$logRT_precrit1 <- log(df$RT_precrit1)
-#df$logRT_precrit2 <- log(df$RT_precrit2)
-df$logProdNorms <- ifelse(df$ProdNorms > 0, log(df$ProdNorms), 0.01)  # smoothe for 0
+df$logProdNorms <- ifelse(df$ProdNorms > 0,
+                          log(df$ProdNorms), 0.01)  # smoothe for 0
 df$logAssociation <- log(df$Association)
 df$logInference <- log(df$Inference)
 df$logCoherence <- log(df$Coherence)
 df$logInfCoPCA <- log(df$InfCoPCA)
+
+# Add interaction variables
+df$AssocInference <- df$Association*df$Inference
+df$AssocCoherence <- df$Association*df$Coherence
 
 # Order df by Region
 df <- arrange(df, Region)
@@ -302,6 +300,8 @@ df <- scalePredictors(
     "Association",
     "Inference",
     "Coherence",
+    "AssocInference",
+    "AssocCoherence",
     "InfCoPCA",
     "RT_precrit1",
     "logRT_precrit1",
@@ -496,11 +496,17 @@ Run a separate lmer model for each region and observe p-values.
 
 ```{r}
 # Split data into different data frames for each region 
+contrasts(df$Cond) <- contr.sum(4)
+contrasts(df$Cond) <- contr.treatment(4)
+contrasts(df$Cond)
+df$Cond <- relevel(df$Cond, ref="A")
+contrasts(df$Cond)
+
 crit <- filter(df, Region==0)
 spill1 <- filter(df, Region==1)
 spill2 <- filter(df, Region==2)
 
-f <- as.formula(logRT ~ logRT_precrit1 + Association * Coherence + (1|Subject) + (1|Item))
+f <- as.formula(logRT ~ Cond + logRT_precrit1 + (1|Subject) + (1|Item))
 
 #######################
 ### CRITICAL REGION ###
@@ -582,20 +588,24 @@ summary(lmer(f7, data=spill2))
 # rRT analysis
 
 In the following analyses, each observed RT is replaced with an estimated RT obtained from a linear mixed effects model (using the lmer function from the lme4 package, Bates et al. 2015).
-Beyond analyzing the estimated RTs, this approach allows to examine how the estimates change dynamically as individual predictors are either a) incrementally added to the model **("forward modeling")**, or b) controlled for by setting them to their grand mean value across conditions **("backward modeling")**.
+Beyond analyzing the estimated RTs, this approach allows to examine how the estimates change dynamically as individual predictors are either a) incrementally added to the model **(forward model construction)**, or b) controlled for by setting them to their grand mean value across conditions, which lets us inspect the contribution of individual predictors to goodness of fit on a by-condition and by-region basis.
 
 In the first part of the analysis, **forward model construction** is used to investigate the impact of individual predictors and perform model selection.
-In particular, it allows to contrast untransformed with log-transformed versions of the same predictor, and to compare the collinear predictors Inference, Coherence and InfCoPCA (the latter being the first component resulting from a principal component analysis combining Inference and Coherence).
+In particular, this approach allows to contrast untransformed with log-transformed versions of the same predictor, and to compare the collinear predictors Inference, Coherence and InfCoPCA (the latter being the first component resulting from a principal component analysis combining Inference and Coherence).
 
-In the second part of the analysis, **backward modeling** is then used to gain insight into how the individual predictors in the full model -- corresponding to specific properties of the stimulus presented at trial $i$ -- combine at a latent level in each trial to form the resulting RT.
+In the second part of the analysis, a technique based on neutralizing predictors in the full model is then used to gain insight into how the individual predictors -- corresponding to specific properties of the stimulus presented at trial $i$ -- combine at a latent level in each trial to form the resulting RT.
 Concretely, the signal for a specific stimulus at each trial $i$ is broken down into a weighted sum of the individual predictors, plus the noise term $\epsilon_i$:
 
 $$
-y_i = \beta_1 x_{1i} + \beta_2 x_{2i} +  ... + \epsilon_i = \sum_{j = 1}^N \beta_j x_{ji} + \epsilon_i
+\begin{align}
+y_i &=  \beta_0 + \beta_1 x_{1i} + \beta_2 x_{2i} +  ... + \epsilon_i \\
+& = \beta_0 + \sum_{j = 1}^N \beta_j x_{ji} + \epsilon_i
+\end{align}
 $$
 
 where 
 
+- $\beta_0$ is the intercept;
 - $\beta_j$ stands for the coefficient estimate for an individual predictor $j$;
 - $x_{ji}$ stands for the stimulus property for predictor $j$ at trial $i$;
 - $\epsilon_i$ stands for the noise in trial $i$
@@ -604,7 +614,7 @@ The goal of the estimation process is to find the set of $\beta_j$'s that minimi
 
 **TODO: add lmer-adjusted formula with random effects**
 
-The impact of each predictor in each region of interest can then be analyzed by inspecting the change in the residual error ensuing when the predictor is controlled for (i.e., set to its mean value -- which in the present analysis corresponds to setting it to zero, given that predictors were standardized to have a mean of $0$ and a standard deviation of $1$).
+The impact of each predictor in each region of interest can then be analyzed by inspecting the change in the residual error ensuing when the predictor is controlled for (i.e., when its coefficient is set to its mean value -- which in the present analysis corresponds to setting it to zero, given that predictors were standardized to have a mean of $0$ and a standard deviation of $1$).
 More precisely, an increase in residual error when controlling for a specific predictor in a model (and correspondingly a larger deviation of the estimated RTs from the observed RTs) indicates that this predictor is critical for reducing the error in that region.
 This provides a quantitative measure of goodness of model fit that allows to compare different models in which the impact of the individual predictors can be isolated (where closer approximation of $\epsilon$ to $0$ means better fit).
 
@@ -658,7 +668,7 @@ if (log.RTs == TRUE) {
 **For the final analyses, lmer models with log-transformed RTs as the DV were used.**
 
 
-## Forward modeling 
+## Forward model construction
 
 This section aims to assess the fit of individual predictors in isololation, starting from a simple baseline model containing only the intercept.
 
@@ -968,7 +978,7 @@ getMeanAICBIC(df, f2, "BIC", regions=0:2)
 getMeanAICBIC(df, f3, "BIC", regions=0:2)
 ```
 
-## Backward modeling 
+## Neutralizing predictors
 
 We start from the full chosen model: 
 
@@ -993,10 +1003,38 @@ p.effect <- plotEffects(m)
 
 p <- grid.arrange(p.coef, p.effect, nrow=1,
              top = textGrob("Full model: Coefficients + Effect size",
-                            gp=gpar(fontsize=14, fontface=2)))
+                            gp=gpar(fontsize=14)))
 
 ggsave("./plots/coef_effectsize.pdf", plot = p,
        width = 10, height = 4, dpi = 300)
+```
+
+**Comparing by-subject linear model, lmer with / without random intercepts for items:**
+
+```{r}
+# Linear model by-subjects:
+f1 <- as.formula(paste0(DV," ~ Association + Coherence + Association:Coherence + ", precrit1))
+m1 <- runModels(df, "lm.by.subj", f1, regions)
+
+# LMER without by-item random intercepts:
+f2 <- as.formula(paste0(DV," ~ Association + Coherence + Association:Coherence + ", precrit1, " + (1|Subject)"))
+m2 <- runModels(df, "lmer", f2, regions)
+
+# LMER with by-item random intercepts:
+f3 <- as.formula(paste0(DV," ~ Association + Coherence + Association:Coherence + ", precrit1, " + (1|Subject) + (1|Item)"))
+m3<- runModels(df, "lmer", f3, regions)
+
+#p1 <- plotSPR(m1, "Residuals", y.unit, c(-0.04, 0.04)) + ggtitle("By-subject linear model")
+#p2 <- plotSPR(m2, "Residuals", y.unit, c(-0.04, 0.04)) + ggtitle("LMER: no by-item intercept")
+#p3 <- plotSPR(m3, "Residuals", y.unit, c(-0.04, 0.04)) + ggtitle("LMER: by-item intercept")
+p1 <- plotSPR(m1, "Residuals", y.unit, y.range.res) + ggtitle("By-subject linear model")
+p2 <- plotSPR(m2, "Residuals", y.unit, y.range.res) + ggtitle("LMER: no by-item intercept")
+p3 <- plotSPR(m3, "Residuals", y.unit, y.range.res) + ggtitle("LMER: by-item intercept")
+p <- grid.arrange(p1, p2, p3, nrow=1,
+                  top = textGrob(paste0("Residuals: linear/lmer model with/without by-item random intercepts"),
+                                 gp=gpar(fontsize=14, fontface=2)))
+ggsave(paste0("./plots/residual_comparison_item_random_intercepts.pdf"), p, 
+       width = 10, height = 5, dpi = 300)
 ```
 
 ### Setting predictors to zero
