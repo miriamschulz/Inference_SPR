@@ -63,10 +63,9 @@ aggregMeans <- function(df,
                         round.data = FALSE) {
   agg.data <- aggregate(agg.formula,
                         data = df,
-                        #na.rm=F,
                         FUN = function(x) {c(Mean = mean(x),
-                                             SD = sd(x),
-                                             SE = sd(x) / sqrt(n))})
+                                           SD = sd(x),
+                                           SE = sd(x) / sqrt(n))})
   if (round.data == TRUE) {
     agg.data <- agg.data %>% 
       mutate_if(is.numeric, round, 2)

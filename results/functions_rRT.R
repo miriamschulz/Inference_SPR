@@ -2,6 +2,7 @@
 ### Miriam Schulz
 ### 15 October 2022
 
+### Functions are documented using roxygen2.
 
 
 #' Function to run the model(s) and generate the plots from a single command
@@ -21,6 +22,7 @@
 #' @export
 #'
 #' @examples
+#' modelAndPlot("My plot", as.formula(logRT ~ Cond), df, "lmer", regions=-1:2, "logRT", "log RT", y.range, y.range.res)
 modelAndPlot <- function(plt.name,
                          m.formula,
                          df,
@@ -102,7 +104,7 @@ runModels <- function(df,
       output.region <- cbind(output.region, original.region)
       
       # Step 2: Coefficients
-      m.coefs <- tidy(m.region)      # extract coefficients 
+      m.coefs <- tidy(m.region)  # extract coefficients 
       for (r in 1:nrow(m.coefs)) {
         term <- m.coefs[r, "term"][[1]]
         term <- paste("Coef", term, sep = "_")
@@ -147,7 +149,6 @@ runModels <- function(df,
         output.region[, term.se] <- se
         output.region[, term.zscore] <- estimate / se
         # Append p-value only if term is not intercept:
-        #if ((i < length(names(m.coefs))+1) & !term == "(Intercept)") {
         if (!term == "(Intercept)") {
           output.region[, term.pvalue] <- m.p[[i-1]]
         }
@@ -302,7 +303,10 @@ generatePlots <- function(model.output,
 #' @export
 #'
 #' @examples
-plotSPR <- function(df, DV, y.unit, y.range) {
+plotSPR <- function(df,
+                    DV,
+                    y.unit,
+                    y.range) {
   
   # Aggregate data 
   cond.means <- aggregMeans(df, as.formula(get(DV) ~ Region + Cond))
@@ -439,7 +443,15 @@ plotCoefs <- function(df) {
     ylab("Model coefficient") +
     ggtitle("Coefficients") +
     scale_color_manual(values = coef_plot_colors) + 
-    theme_minimal()
+    theme_minimal() +
+    theme(text = element_text(size = 11),
+          #legend.key.width=unit(1,"cm"),
+          #legend.key.size = unit(0.3, "cm"),
+          legend.title = element_text(size=7),
+          legend.text = element_text(size=7),
+          #legend.position = "bottom",
+          #plot.margin = unit(c(0,1,0,0), "cm"), # prevent x-axis text from being cut off at the right
+          panel.grid.minor.x = element_blank()) # remove vertical lines between x ticks
   
   # Add region labels if the regions range from precritical to post-spillover
   if (setequal(range(df$Region), c(-1, 2))) {
@@ -500,7 +512,7 @@ plotEffects <- function(df) {
   
   df <- merge(zscores, SEs, by=c("Region", "Coefficient"))
   df <- merge(df, pvals, by=c("Region", "Coefficient"))
-  df$Significant <- factor(ifelse(df$Pvalue < 0.05, "p<0.05", "ns"))
+  df$Significant <- factor(ifelse(df$Pvalue < 0.05, "p < 0.05", "ns"))
 
   effect_plot_colors <- c("deeppink2", "purple3", "cyan2",
                           "lightseagreen", "plum2", "powderblue",
@@ -514,16 +526,26 @@ plotEffects <- function(df) {
                y=Zscore,
                color = Coefficient,
                group = Coefficient,
-               shape = Significant)) + 
-    #geom_point(size=2.5, shape="cross") + 
-    geom_point(size=2.5) + 
+               shape = Significant,
+               size=Significant)) + 
+    #geom_point(size=4) + 
+    geom_point() + 
     geom_line(linewidth=0.5) +
     ylab("Z score") +
     ggtitle("Effect size") +
     scale_color_manual(values = effect_plot_colors) + 
-    scale_shape_manual(values = c(1, 8)) +  # shapes for the p-values
+    scale_shape_manual(values = c(16, 8)) +  # shapes for the p-values
+    scale_size_manual(values = c(1.5, 4))   +   # sizes for the p-values
     geom_hline(yintercept=0, linetype="dashed") +
-    theme_minimal()
+    theme_minimal() +
+    theme(text = element_text(size = 11),
+          #legend.key.width=unit(1,"cm"),
+          #legend.key.size = unit(0.3, "cm"),
+          legend.title = element_text(size=7),
+          legend.text = element_text(size=7),
+          #legend.position = "bottom",
+          #plot.margin = unit(c(0,1,0,0), "cm"), # prevent x-axis text from being cut off at the right
+          panel.grid.minor.x = element_blank()) # remove vertical lines between x ticks
   
   # Add region labels if the regions range from precritical to post-spillover
   if (setequal(range(df$Region), c(-1, 2))) {
