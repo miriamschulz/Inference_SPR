@@ -1,0 +1,284 @@
+---
+title: "Pretest results"
+author: "Miriam Schulz"
+date: "2023-02-14"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      collapse = TRUE,
+                      message = FALSE,
+                      fig.width = 5, 
+                      fig.height = 4)
+```
+
+# About 
+
+This script runs Bonferroni-corrected pairwise t-tests on the results of the four pretests (Production Norms, Association Ratings, Inference Ratings, and Coherence Ratings) and visualizes the results as barplots and density plots.
+
+In addition, a correlation matrix is computed and the correlation between Inference and Coherence ratings is plotted.
+
+Plots are saved to the working directory.
+
+```{r echo = FALSE, results = FALSE}
+rm(list=ls()) # clear workspace (optional)
+
+### Libraries
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(Hmisc)  # for correlation matrix
+
+
+### Functions 
+
+# Function to aggregate data
+aggregMeans <- function(df,
+                        agg.formula, 
+                        n=40,
+                        round.data = FALSE) {
+  agg.data <- aggregate(agg.formula,
+                        data = df,
+                        FUN = function(x) {c(Mean = mean(x),
+                                             SD = sd(x),
+                                             SE = sd(x) / sqrt(n))})
+  if (round.data == TRUE) {
+    agg.data <- agg.data %>% 
+      mutate_if(is.numeric, round, 2)
+  }
+  # Transform to data frame
+  agg.data <- do.call(data.frame, agg.data)
+  # Rename last columns
+  newnames <- colnames(agg.data)[!colnames(agg.data) %in% 
+                                   tail(colnames(agg.data), 3)]
+  names(agg.data) <- c(newnames, "Mean", "SD", "SE")
+  agg.data
+}
+
+# Barplot function 
+barplotRatings <- function(df,
+                           plotname, 
+                           yrange=c(0,7)) {
+  # Generate plot
+  p <- ggplot(data = df,
+              aes(Cond, Mean)) +
+    geom_bar(aes(fill = Cond),
+             stat = "identity",
+             show.legend = FALSE) +
+    ylim(yrange) +
+    geom_errorbar(aes(ymin = Mean - SE,
+                      ymax = Mean + SE),
+                  width = .2,
+                  position = position_dodge(.9)) +
+    scale_fill_manual(values = colors.dark) +
+    xlab("Condition") +
+    ylab("Rating") +
+    #coord_cartesian(ylim=c(1,7)) +  #TODO remove (doesnt work as intended)
+    theme_minimal() +
+    theme(text = element_text(size = 30),
+          plot.title = element_text(hjust = 0.5))
+  
+  # Save plot
+  ggsave(
+    paste0("./plots_pretests/barplot_", plotname, ".pdf"),
+    plot = p,
+    width = 7,
+    height = 6,
+    dpi = 300
+  )
+  p
+}
+
+# Density plot function
+densityplotRatings <- function(df,
+                               ratings.colname,
+                               plotname,
+                               xrange=c(1,7)) {
+  # Generate plot
+  p <- ggplot(data = df,
+              aes(x = get(ratings.colname),
+                  fill = Cond,
+                  color = Cond)) +
+    geom_density(alpha = 0.5) +
+    xlim(xrange) +
+    xlab(ratings.colname) +
+    ylab("Density") +
+    scale_color_manual("Condition", values = colors.dark) +
+    scale_fill_manual("Condition", values = colors.bright) +
+    theme_minimal()
+  
+  # Save plot
+  ggsave(
+    paste0("./plots_pretests/densityplot_", plotname, ".pdf"),
+    plot = p,
+    width = 4,
+    height = 3,
+    dpi = 300
+  )
+  p
+}
+
+
+### Define colors for the plots: outline (fill) and main (color)
+#colors.dark <- c(
+#  "A" = "deepskyblue3",
+#  "B" = "chartreuse3",
+#  "C" = "coral3",
+#  "D" = "darkgoldenrod3"
+#)
+# colors.bright <- c(
+#   "A" = "deepskyblue1",
+#   "B" = "chartreuse1",
+#   "C" = "coral1",
+#   "D" = "darkgoldenrod1"
+# )
+
+colors.bright <- c(
+  "A" = "lightskyblue2",
+  "B" = "chartreuse1",
+  "C" = "coral1",
+  "D" = "gold1"
+)
+
+colors.dark <- c("A" = "cornflowerblue",
+                 "B" = "chartreuse3",
+                 "C" = "tomato2",
+                 "D" = "darkgoldenrod1")
+
+### Read data
+df <- read.csv("items_pretests.csv")
+df$Cond <- as.factor(df$Cond)
+str(df)
+
+### Completeness checks 
+xtabs(~ Cond, data=df)
+xtabs(~ Item, data=df)
+```
+
+
+Calculate the per-condition mean, SD and SE for each pretest:
+
+```{r}
+df.ab <- filter(df, Cond %in% c("A", "B"))
+(means.prod <- aggregMeans(df.ab, as.formula(ProductionPercentage ~ Cond), n=30))
+(means.assoc <- aggregMeans(df, as.formula(AssociationRating ~ Cond), n=20))
+(means.inference <- aggregMeans(df, as.formula(InferenceRating ~ Cond), n=40))
+(means.coherence <- aggregMeans(df, as.formula(CoherenceRating ~ Cond), n=40))
+```
+
+# Stats
+
+```{r}
+# Significance tests
+#options(scipen=999)
+pairwise.t.test(df.ab$ProductionPercentage, df.ab$Cond, p.adj = "bonferroni")
+pairwise.t.test(df.ab$AssociationRating, df.ab$Cond, p.adj = "bonferroni")
+pairwise.t.test(df$InferenceRating, df$Cond, p.adj = "bonferroni")
+pairwise.t.test(df$CoherenceRating, df$Cond, p.adj = "bonferroni")
+#options(scipen=0)
+```
+
+
+# Plots
+
+## Bar plots
+
+```{r fig.width = 6, fig.height = 5}
+barplotRatings(means.prod, "prodnorms", yrange=c(0,1))
+barplotRatings(means.assoc, "association")
+barplotRatings(means.inference, "inference")
+barplotRatings(means.coherence, "coherence")
+```
+
+## Density plots:
+
+```{r}
+densityplotRatings(df.ab, "ProductionPercentage", "prodnorms", xrange=c(0,1))
+densityplotRatings(df.ab, "AssociationRating", "association")
+densityplotRatings(df, "InferenceRating", "inference")
+densityplotRatings(df, "CoherenceRating", "coherence")
+```
+
+# Correlations
+
+## Correlation matrix
+
+
+```{r}
+# Check for correlation between Inference and Coherence 
+cor(df$CoherenceRating, df$InferenceRating)
+cor.test(df$CoherenceRating, df$InferenceRating)
+
+cor.columns <- c("ProductionPercentage", "AssociationRating",
+                 "InferenceRating", "CoherenceRating")
+
+# Tables of all correlations with p-values
+Hmisc::rcorr(as.matrix(df[, cor.columns]))
+```
+
+## Plot: correlation between Inference & Coherence
+
+```{r}
+p <- df %>% ggplot(aes(x = InferenceRating,
+                       y = CoherenceRating,
+                       color = Cond)) +
+  geom_point(size=2) +
+  geom_smooth(method = 'lm',
+              formula = y ~ x,
+              color = "black") +
+  scale_color_manual("Condition", values = colors.dark) +
+  scale_x_continuous(breaks = 1:7) +
+  scale_y_continuous(breaks = 1:7) +
+  coord_cartesian(xlim=c(1,7),ylim=c(1,7), clip="on") +
+  labs(#title="Correlation: Inference and Coherence Ratings",
+       x = "Inference Rating", 
+       y = "Coherence Rating") +
+  theme_minimal() +
+  theme(text = element_text(size = 20),
+        plot.margin = unit(c(1,0,0,0), "cm"),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank()) +
+       # legend.position = "bottom")+ 
+  guides(color = guide_legend(override.aes = list(size = 5)))
+
+# Save plot
+ggsave(
+  paste0("./plots_pretests/correlation.pdf"),
+  plot = p,
+  width = 6,
+  height = 4.5,
+  dpi = 300
+)
+  
+p + ggtitle("Correlation")
+```
+
+
+# Negation types 
+
+```{r}
+# Check whether different negation types used (nicht, niemals, kein+jemals) had an impact on 
+# the coherence / inference ratings:
+
+xtabs(~ NegationType, df[df$Cond == "A", ])
+
+df$NegationClass <- ifelse(df$NegationType %in% c("kein+je", "kein+jemals"), "kein+je(mals)",
+                           ifelse(df$NegationType %in% c("nie", "niemals"), "nie/niemals", 
+                                  ifelse(df$NegationType %in% c("nicht", "noch nicht"), "nicht", df$NegationType)
+                                  )
+                           )
+
+xtabs(~ NegationClass, df[df$Cond == "A", ])
+
+aggregate(InferenceRating ~ Cond + NegationClass, 
+          data=df,
+          FUN=mean)
+aggregate(CoherenceRating ~ Cond + NegationClass, 
+          data=df,
+          FUN=mean)
+```
+
