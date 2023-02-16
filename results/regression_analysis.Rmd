@@ -495,18 +495,25 @@ Run a separate lmer model for each region and observe p-values.
 **TODO: use contrast-coded Condition as predictor instead of continuous predictors for the "traditional" analysis?**
 
 ```{r}
-# Split data into different data frames for each region 
-contrasts(df$Cond) <- contr.sum(4)
-contrasts(df$Cond) <- contr.treatment(4)
-contrasts(df$Cond)
-df$Cond <- relevel(df$Cond, ref="A")
-contrasts(df$Cond)
+# Create binary predictor for association levels
+df$Associated <- as.factor(ifelse(df$Cond %in% c("A", "C"), 1, 0))
 
+# Set contrasts
+#contrasts(df$Cond) <- car::contr.Sum(levels(df$Cond))
+#contrasts(df$Cond)
+contrasts(df$Plausible) <- contr.sum(2)
+contrasts(df$Associated) <- contr.sum(2)
+
+contrasts(df$Plausible)
+contrasts(df$Associated)
+
+# Split data into different data frames for each region 
 crit <- filter(df, Region==0)
 spill1 <- filter(df, Region==1)
 spill2 <- filter(df, Region==2)
 
-f <- as.formula(logRT ~ Cond + logRT_precrit1 + (1|Subject) + (1|Item))
+#f <- as.formula(logRT ~ Cond + logRT_precrit1 + (1|Subject) + (1|Item))
+f <- as.formula(logRT ~ Associated*Plausible + logRT_precrit1 + (1|Subject) + (1|Item))
 
 #######################
 ### CRITICAL REGION ###
@@ -528,6 +535,7 @@ summary(lmer(f, data=spill2))
 ```
 
 **Observations:**
+TODO: adjust for condition-coded model
 
 - Only precritical RT is significant in the target region, suggesting that the remaining predictors cannot capture the variance in that region
 - Coherence becomes significant in the first spillover region
@@ -610,7 +618,7 @@ where
 - $x_{ji}$ stands for the stimulus property for predictor $j$ at trial $i$;
 - $\epsilon_i$ stands for the noise in trial $i$
 
-The goal of the estimation process is to find the set of $\beta_j$'s that minimizes $\epsilon_i$ across trials, given the stimulus properties $x_{ji}$.
+The goal of the estimation process is to find the set of most optimal $\hat{\beta}_j$'s that minimizes $\epsilon_i$ across trials, given the stimulus properties $x_{ji}$.
 
 **TODO: add lmer-adjusted formula with random effects**
 
@@ -816,7 +824,7 @@ modelAndPlot("Full model (no interaction)",
 
 ```{r, results = FALSE, echo = FALSE, fig.width=9, fig.height=5}
 m.formula <- as.formula(paste0(DV, " ~ 1 + Association + Coherence + 
-   logRT_precrit1 +  Association*Coherence + (1|Subject) + (1|Item)"))
+   logRT_precrit1 +  Association:Coherence + (1|Subject) + (1|Item)"))
 modelAndPlot("Full model (with interaction)",
              m.formula,
              df,
