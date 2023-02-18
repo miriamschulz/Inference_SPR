@@ -52,6 +52,7 @@ se <- function(x, n=40) {sd(x) / sqrt(n)}
 #' @param agg.formula A formula as input for the aggregate function
 #' @param n 
 #' @param round.data Boolean: if TRUE, rounds numbers to 2 decimal places
+#' @param by-subject Boolean: if TRUE, adds another aggregate step by subjects
 #'
 #' @return
 #' @export
@@ -59,17 +60,32 @@ se <- function(x, n=40) {sd(x) / sqrt(n)}
 #' @examples
 aggregMeans <- function(df,
                         agg.formula, 
-                        n=40,
-                        round.data = FALSE) {
+                        n = 40,
+                        round.data = FALSE,
+                        by.subject = FALSE) {
+  # Run a preliminary aggregation step by subject, if by.subject = TRUE
+  if (by.subject == TRUE) {
+    # Update formula to include the subject term
+    agg.formula.subj <- update(agg.formula, ~ . + Subject)
+    # Run first aggregate step
+    df <- aggregate(agg.formula.subj,
+                    data = df,
+                    FUN = mean,
+                    na.rm = TRUE)
+  }
+  
+  # Aggregate data
   agg.data <- aggregate(agg.formula,
                         data = df,
                         FUN = function(x) {c(Mean = mean(x),
                                            SD = sd(x),
                                            SE = sd(x) / sqrt(n))})
+  # Round data
   if (round.data == TRUE) {
     agg.data <- agg.data %>% 
       mutate_if(is.numeric, round, 2)
   }
+  
   # Transform to data frame
   agg.data <- do.call(data.frame, agg.data)
   # Rename last columns
@@ -77,87 +93,6 @@ aggregMeans <- function(df,
                                    tail(colnames(agg.data), 3)]
   names(agg.data) <- c(newnames, "Mean", "SD", "SE")
   agg.data
-}
-
-
-#' Aggregate data using the mean and standard error (OLD FUNCTION)
-#'
-#' @description
-#' Data are aggregated using the mean and se function.
-#' Variables are passed as a character vector, beginning with the dependent
-#' variable and continuing with one to three independent variables.
-#'
-#' @param df A data frame 
-#' @param var.list A character vector of the variables (DV first, then 1-3 IVs)
-#' @param use.sd Boolean: if true, uses the SD function instead of SE
-#' @param n An integer: sample size to calculate the standard error
-#'
-#' @return A data frame of the aggregated means and the SE
-#' @export
-#'
-#' @examples
-#' aggMeansSE(df, c("RT", "Cond", "Region"))
-aggMeansSE <- function(df, var.list, use.sd=FALSE, n=40) {
-  
-  if (use.sd==TRUE) {
-    var.function = sd
-    var.name = "SD"
-  } else {
-    var.function = se
-    var.name = "SE"
-  }
-  if (length(var.list) == 2) {
-    
-    y <- parse(text = var.list[1])
-    var1 <- parse(text = var.list[2])
-    means.cond <- aggregate(eval(y) ~ eval(var1),
-                            data = df,
-                            FUN = mean)
-    means.condVAR <- aggregate(eval(y) ~ eval(var1),
-                               data = df,
-                               FUN = var.function)
-    var.list <- var.list[-1]  # remove y
-    colnames(means.cond) <- c(var.list, paste0("Mean", y))
-    colnames(means.condVAR) <- c(var.list, var.name)
-    means.cond <- merge(means.cond, means.condVAR, by=var.list)
-    
-  } else if (length(var.list) == 3) {
-    
-    y <- parse(text = var.list[1])
-    var1 <- parse(text = var.list[2])
-    var2 <- parse(text = var.list[3])
-    means.cond <- aggregate(eval(y) ~ eval(var1) + eval(var2),
-                            data = df,
-                            FUN = mean)
-    means.condVAR <- aggregate(eval(y) ~ eval(var1) + eval(var2),
-                               data = df,
-                               FUN = var.function)
-    var.list <- var.list[-1]  # remove y
-    colnames(means.cond) <- c(var.list, paste0("Mean", y))
-    colnames(means.condVAR) <- c(var.list, var.name)
-    means.cond <- merge(means.cond, means.condVAR, by=var.list)
-    
-  } else if (length(var.list) == 4) {
-    
-    y <- parse(text = var.list[1])
-    var1 <- parse(text = var.list[2])
-    var2 <- parse(text = var.list[3])
-    var3 <- parse(text = var.list[4])
-    means.cond <- aggregate(eval(y) ~ eval(var1) + eval(var2) + eval(var3),
-                            data = df,
-                            FUN = mean)
-    means.condVAR <- aggregate(eval(y) ~ eval(var1) + eval(var2) + eval(var3),
-                               data = df,
-                               FUN = var.function)
-    var.list <- var.list[-1]  # remove y
-    colnames(means.cond) <- c(var.list, paste0("Mean", y))
-    colnames(means.condVAR) <- c(var.list, var.name)
-    means.cond <- merge(means.cond, means.condVAR, by=var.list)
-    
-  } else {
-    stop("This function takes as input a dataframe and a list of 2-4 variables, starting with Y, then X.")
-  }
-  means.cond
 }
 
 
@@ -461,12 +396,12 @@ printDataLoss <- function(nrow.start, nrow.end) {
 #'
 #' @examples
 #' removeOutliersSPR(df, "threshold", min.rt=100, max.rt=3000)
-#' removeOutliersSPR(df, "sd", 2, entire.trial=FALSE)
+#' removeOutliersSPR(df, "sd", 3, entire.trial=FALSE)
 removeOutliersSPR <- function(df,
                               method,
-                              min.rt=50,
-                              max.rt=2500,
-                              sd.value=2.5,
+                              min.rt = 50,
+                              max.rt = 2500,
+                              sd.value = 2.5,
                               entire.trial = TRUE,
                               regions = -1:2) {
   
@@ -482,22 +417,39 @@ removeOutliersSPR <- function(df,
     
   } else if (method == "sd") {
     
-    cat(sprintf("Filtering RTs using method: SD by participant (cutoff value: +- %s SD(s))\n",
-            sd.value))
+    cat(sprintf(
+        "Filtering RTs using method: SD by participant (cutoff value: +- %s SD(s))\n",
+        sd.value))
     
-    participant.SDs <- df %>% 
-      group_by(Subject) %>% 
+    participant.SDs <- df %>%
+      filter(Region %in% regions) %>%
+      group_by(Subject) %>%
       summarize(SubjectMean = mean(RT),
                 SubjectSD = sd(RT))
-      df <- merge(df, participant.SDs, by="Subject", all=TRUE)
-      
-      df$UpperBound <- df$SubjectMean + sd.value*df$SubjectSD
-      df$LowerBound <- df$SubjectMean - sd.value*df$SubjectSD
-      df$ExcludeTrial <- ifelse((df$RT > df$UpperBound | df$RT < df$LowerBound),
-                                "yes", "no")
-      df$UpperBound <- NULL
-      df$LowerBound <- NULL
-
+    df <- merge(df, participant.SDs, by = "Subject", all = TRUE)
+    
+    df$UpperBound <- df$SubjectMean + sd.value * df$SubjectSD
+    df$LowerBound <- df$SubjectMean - sd.value * df$SubjectSD
+    df$ExcludeTrial <-
+      ifelse((df$RT > df$UpperBound | df$RT < df$LowerBound),
+             "yes", "no")
+    
+    # Print the range in means by subject
+    #cat(sprintf("Mean by subject RT ranges from %s ms to %s ms.\n",
+    #            round(min(df$SubjectMean)),
+    #            round(max(df$SubjectMean))))
+    
+    # Print the maximal distance after which data points are removed
+    df$RangeRemoved <- sd.value * df$SubjectSD
+    cat(paste0("Largest deviation from the by subject mean in ms: ",
+               round(max(df$RangeRemoved)),
+               "\n"))
+    
+    # Remove not needed columns
+    df$RangeRemoved <- NULL
+    df$UpperBound <- NULL
+    df$LowerBound <- NULL
+    
   } else {
     stop("Please select a valid method (threshold or sd).")
   }

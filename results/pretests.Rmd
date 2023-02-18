@@ -24,6 +24,9 @@ In addition, a correlation matrix is computed and the correlation between Infere
 
 Plots are saved to the working directory.
 
+
+# Mean results by condition
+
 ```{r echo = FALSE, results = FALSE}
 rm(list=ls()) # clear workspace (optional)
 
@@ -105,6 +108,7 @@ densityplotRatings <- function(df,
                   color = Cond)) +
     geom_density(alpha = 0.5) +
     xlim(xrange) +
+    #scale_x_continuous(breaks = xrange[1]:xrange[2]) +
     xlab(ratings.colname) +
     ylab("Density") +
     scale_color_manual("Condition", values = colors.dark) +
@@ -124,26 +128,12 @@ densityplotRatings <- function(df,
 
 
 ### Define colors for the plots: outline (fill) and main (color)
-#colors.dark <- c(
-#  "A" = "deepskyblue3",
-#  "B" = "chartreuse3",
-#  "C" = "coral3",
-#  "D" = "darkgoldenrod3"
-#)
-# colors.bright <- c(
-#   "A" = "deepskyblue1",
-#   "B" = "chartreuse1",
-#   "C" = "coral1",
-#   "D" = "darkgoldenrod1"
-# )
-
 colors.bright <- c(
   "A" = "lightskyblue2",
   "B" = "chartreuse1",
   "C" = "coral1",
   "D" = "gold1"
 )
-
 colors.dark <- c("A" = "cornflowerblue",
                  "B" = "chartreuse3",
                  "C" = "tomato2",

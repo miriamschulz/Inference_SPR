@@ -5,6 +5,30 @@
 ### Functions are documented using roxygen2.
 
 
+#' Generate model formula for lm or lmer
+#'
+#' @param DV A string: dependent variable
+#' @param IVs Either a list of strings for the IVs, or "1" for the intercept
+#' @param rand.ef A string starting with "+" containing the random effects structure (empty for lm)
+#'
+#' @return
+#' @export
+#'
+#' @examples
+#' makeFormula(DV, IVs = "1", rand.ef = "+ (1|Subject) + (1|Item)")
+#' makeFormula(DV, IVs = c("Cond", "Region))
+makeFormula <- function(DV,
+                        IVs,
+                        rand.ef = "") {
+  
+  m.formula <- as.formula(paste0(DV,
+                                 " ~ ",
+                                 IVs,
+                                 rand.ef))
+  m.formula
+}
+
+
 #' Function to run the model(s) and generate the plots from a single command
 #'
 #' @param plt.name A character string representative of the model formula
@@ -133,7 +157,7 @@ runModels <- function(df,
       colnames(original.region) <- paste0("Model_", colnames(original.region))
       output.region <- cbind(output.region, original.region)
       
-      # Step 2: Coefficients  + coefficient SE
+      # Step 2: Coefficients, coefficient SE, p-values
       m.coefs <- fixef(m.region)          # extract coefficients 
       m.se <- sqrt(diag(vcov(m.region)))  # extract SE for each coefficient
       m.p <- anova(m.region)[6]$`Pr(>F)`  # extract p-value for each coefficient
@@ -308,8 +332,10 @@ plotSPR <- function(df,
                     y.unit,
                     y.range) {
   
-  # Aggregate data 
-  cond.means <- aggregMeans(df, as.formula(get(DV) ~ Region + Cond))
+  # Aggregate data by Region + Cond
+  f <- as.formula(paste0(DV, " ~ Region + Cond"))
+  cond.means <- aggregMeans(df,
+                            f)
 
   pd <- position_dodge(0)  # set to 0 for no jitter/position dodge
 
@@ -317,7 +343,6 @@ plotSPR <- function(df,
   p <- cond.means %>% ggplot(aes(x = Region,
                                  y = Mean,
                                  color=Cond,
-                                 #shape=Cond,
                                  group=Cond,
                                  )) + 
     geom_errorbar(aes(ymin = Mean - SE,
