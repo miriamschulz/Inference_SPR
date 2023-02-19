@@ -156,7 +156,7 @@ runModels <- function(df,
       original.region <- model.frame(m.region)
       colnames(original.region) <- paste0("Model_", colnames(original.region))
       output.region <- cbind(output.region, original.region)
-      
+
       # Step 2: Coefficients, coefficient SE, p-values
       m.coefs <- fixef(m.region)          # extract coefficients 
       m.se <- sqrt(diag(vcov(m.region)))  # extract SE for each coefficient
@@ -177,7 +177,24 @@ runModels <- function(df,
           output.region[, term.pvalue] <- m.p[[i-1]]
         }
       }
-      
+
+      # Step 3: Random effects
+      rand.ef <- ranef(m.region)   # extract coefficients
+      if ("Item" %in% names(rand.ef)) {
+        rand.ef.items <- rand.ef$Item
+        rand.ef.items$Item <- rownames(rand.ef.items)
+        colnames(rand.ef.items) <- c("RanEfItem", "Model_Item")
+        output.region <- merge(output.region, rand.ef.items,
+                               by=c("Model_Item"), all=TRUE)
+      }
+      if ("Subject" %in% names(rand.ef)) {
+        rand.ef.subj <- rand.ef$Subject
+        rand.ef.subj$Subject <- rownames(rand.ef.subj)
+        colnames(rand.ef.subj) <- c("RanEfSubject", "Model_Subject")
+        output.region <- merge(output.region, rand.ef.subj,
+                               by=c("Model_Subject"), all=TRUE)
+      }
+
       # Bind to original df (or create)
       if (exists("output") == FALSE) {
         output <- output.region
@@ -259,9 +276,9 @@ runModels <- function(df,
 #' @param y.unit A character string: label of the y axis
 #' @param y.range A numeric vector: range for the y axis of the Observed + Estimate plots
 #' @param y.range.res A numeric vector: range for the y axis of the residuals plot
-#' @param coef.plot Boolean: if TRUE, plots the model coefficients (use FALSE for interaction models with too many coefficients)
+#' @param coef.plot Boolean: if TRUE, plots the model coefficients + effect size
 #'
-#' @return A ggplot2 grid.arranged plot of 3 or 4 plots (coefficient plot optional)
+#' @return A ggplot2 grid.arranged plot of 3 or 4 plots
 #' @export
 #'
 #' @examples
@@ -272,14 +289,15 @@ generatePlots <- function(model.output,
                           y.unit,
                           y.range,
                           y.range.res, 
-                          coef.plot = TRUE) {
+                          coef.plot = FALSE) {
   
   # Add model type to model name:
   model.types <- c("lm" = " (simple LM)",
                    "lmer" = " (LMER)",
                    "lm.by.subj" = " (by-subject LMs)")
   model.name <- paste0(model.name, model.types[model.type])
-  filename <- paste0("./plots/", DV, "_", model.name, ".png")
+  filename <- paste0("./plots/", DV, "_", model.name, ".pdf")
+  filename.coef <- paste0("./plots/", DV, "_", model.name, "_coef.pdf")
   
   # Observed data
   p.observed <- plotSPR(model.output, DV, y.unit, y.range)
@@ -295,22 +313,29 @@ generatePlots <- function(model.output,
                          y.unit, y.range.res)
   p.residuals <- p.residuals + ggtitle( "Residuals")
   
+  # Combine into one plot
+  p <- grid.arrange(p.observed, p.estimates, p.residuals, nrow=1,
+                    top = textGrob(model.name, gp=gpar(fontsize=20)),
+                    padding=unit(2, "cm"))
+  # Save
+  ggsave(filename, plot = p, width = 12, height = 5)
+  
   # Coefficients
+  # Not yet supported for lm and lm.by.subj, set to FALSE for these:
+  coef.plot <- ifelse(model.type == "lmer", coef.plot, FALSE)
   if (coef.plot == TRUE) {
-    # Generate coefficient plot 
-    p.coefs <- plotCoefs(model.output)
-    # Combine into one plot
-    p <- grid.arrange(p.observed, p.estimates, p.residuals, p.coefs, nrow=2,
-                      top = textGrob(model.name, gp=gpar(fontsize=14)))  # fontface = 2
-    ggsave(filename, plot = p, width = 8, height = 6)
     
-  } else {
-    # Combine into one plot
-    p <- grid.arrange(p.observed, p.estimates, p.residuals, nrow=1,
-                      top = textGrob(model.name, gp=gpar(fontsize=20)),
-                      padding=unit(2, "cm"))  # fontface = 2
-    # Save
-    ggsave(filename, plot = p, width = 12, height = 5)  # for 3 plots, excluding coef plot
+    # Get coefficient plot and effect size plot
+    p.coef <- plotCoefs(model.output)
+    p.effect <- plotEffects(model.output)
+    
+    # Arrange plots in grid together
+    p.coef.eff <- grid.arrange(p.coef, p.effect, nrow=1)#,
+                      #top = textGrob("Full model: Coefficients + Effect size",
+                      #               gp=gpar(fontsize=14)))
+    
+    ggsave(filename.coef, plot = p.coef.eff,
+           width = 10, height = 4, dpi = 300)
   }
   p
 }
@@ -440,10 +465,6 @@ plotCoefs <- function(df) {
     rename(SE = Estimate)
   coef.means <- merge(df, SEs, by=c("Region", "Coefficient"))
 
-    # Aggregate data 
-  #coef.means <- aggregMeans(df, as.formula(Estimate ~ Coefficient + Region))
-  #print(coef.means)
-
   # Manual color palette 
   #coef_plot_colors <- c("#222222",  # black for the intercept
   #                      brewer.pal(n=max(3, length(unique(df$Coefficient))),
@@ -465,7 +486,7 @@ plotCoefs <- function(df) {
                       ymax = Estimate + SE),
                   width=0.1, linewidth=0.3) +
     #ylim(y.range[1], y.range[2]) +  # remove ylim for coef plots!
-    ylab("Model coefficient") +
+    ylab("Coefficient estimate") +
     ggtitle("Coefficients") +
     scale_color_manual(values = coef_plot_colors) + 
     theme_minimal() +
@@ -618,6 +639,75 @@ compareLogToUntransformed <- function(df,
   suppressMessages(ggsave(paste0("./plots/residual_comparison_", var.untransformed, "_",
                 var.log, ".pdf"), p, dpi = 300))
   #p
+}
+
+
+#' Control for a predictor in a model (by setting it to its mean, zero)
+#'
+#' @param m.output A model output (output of runModels())
+#' @param neutralize A character vector: column name of predictor(s) to neutralize
+#' @param model.ivs A character vector: name of all variables in the model
+#' @param rand.ef.cols A character vector: column names of random effects (intercepts only for now) 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+neutralizePredictors <- function(m.output,
+                                 neutralize,
+                                 model.ivs,
+                                 rand.ef.cols=c()) {
+  
+  m <- m.output
+  plt.name <- paste(neutralize, collapse="_")
+  plt.name <- paste0("./plots/Neutralizing_", plt.name, ".pdf")
+  
+  # Manually add interaction original value
+  m$`Association:Inference` <- m$Association*m$Inference
+
+  # Initialize the new output with the intercept 
+  new.estimate <- m[, "Coef_(Intercept)"]
+  
+  # Remove controlled variable from list 
+  model.ivs <- model.ivs[!model.ivs %in% neutralize]
+  
+  # Add all variables 
+  for (iv in model.ivs) {
+    iv.est <- m[, iv]
+    iv.coef <- m[, paste0("Coef_", iv)]
+    new.estimate <- new.estimate + (iv.est*iv.coef)
+  }
+  
+  # Manually compensate for the interaction, if it was to be neutralized:
+  if ("Association:Inference" %in% neutralize) {
+    new.estimate <- new.estimate + m$`Coef_Association:Inference` * mean(m$`Association:Inference`)
+    cat("Correcting for the Association:Inference mean...\n")
+  }
+  
+  # For LMER, add random intercepts for Item+Subject
+  if (length(rand.ef.cols) > 0) {
+    for (rand.int in rand.ef.cols) {
+      cat(paste0("Including random effect: ", rand.int, "\n"))
+      new.estimate <- new.estimate + m[, rand.int]
+    }
+  }
+  
+  m$FittedValuesControlled <- new.estimate
+  m$Residuals <- m[, DV] - m$FittedValuesControlled
+  
+  # Estimates
+  p.estimates <- plotSPR(m, "FittedValuesControlled",
+                         y.unit, y.range) + ggtitle("Estimated RTs") + 
+    theme(plot.margin = unit(c(0.5,1,0,0.5), "cm"))
+  
+  # Residuals
+  p.residuals <- plotSPR(m, "Residuals",
+                         y.unit, y.range.res) + ggtitle( "Residuals") + 
+    theme(plot.margin = unit(c(0.5,1,0,0.5), "cm"))
+  
+  # Combine into one plot
+  p <- grid.arrange(p.estimates, p.residuals, nrow=1) 
+  suppressMessages(ggsave(plt.name, p, width = 6, height = 3, dpi = 300))
 }
 
 

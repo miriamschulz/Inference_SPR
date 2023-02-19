@@ -419,7 +419,7 @@ Check the presence of a task effect, i.e., decreasing RTs over the course of the
 
 **Method 1: RT ~ Block**
 
-```{r echo = FALSE, fig.width=4, fig.height=3}
+```{r echo = FALSE, fig.width=3, fig.height=2.5}
 mean.RT.block <- aggregMeans(filter(df, Region==0),
                              as.formula(RT ~ Block))
 
@@ -434,10 +434,11 @@ p.taskeffect <- mean.RT.block %>%
   xlab("Time (Block)") +
   ylab("RT (ms)") +
   scale_colour_brewer(palette="Dark2")+
-  theme_minimal()
+  theme_minimal() + 
+  theme(legend.position="None")
 
 ggsave("./plots/taskeffect.pdf", p.taskeffect,
-       width = 4, height = 3, dpi=300)
+       width = 3, height = 2.5, dpi=300)
 
 p.taskeffect + ggtitle("Mean RT by block position")
 ```
@@ -624,15 +625,13 @@ This section aims to assess the fit of individual predictors in isolation, start
 
 **Aims:**
 
-A) provide preliminary insights into the variance in the signal, and the impact of each predictor in isolation
+A) provide preliminary insights into the variance in the signal, and the impact of each predictor in isolation; then gradually build models by adding predictors.
 B) determine the impact of log-transformations of the predictors for the following predictors: Production Norms, Association, Inference, Coherence (and precriticalRT?)
-C) compare the collinear predictors Inference, Coherence
 
 **Method:**
 
 A) begin with a baseline (intercept only) model, then add the individual predictors of interest one by one
 B) compare residual plots for different versions of the *same* predictor (e.g. untransformed Association vs. log-transformed Association), using a subset of the experimental conditions for which there is variation in this predictor while variation is minimized among the other predictors
-C) compare residual plots for different correlated predictors: Inference, Coherence
 
 ### A) From baseline to full model
 
@@ -699,10 +698,10 @@ modelAndPlot("Intercept + RT_precrit + Association",
              y.unit,
              y.range,
              y.range.res,
-             coef.plot = FALSE)
+             coef.plot = TRUE)
 ```
 
-The next three plots add Coherence, Inference individually to the baseline model (Intercept + precritical RT), all three leading to improvements in model fit:
+The next two plots add Coherence and Inference individually to the baseline model (Intercept + precritical RT), both leading to similar improvements in model fit:
 
 ```{r, results = FALSE, echo = FALSE, fig.width=9, fig.height=5}
 m.formula <- makeFormula(DV,
@@ -717,7 +716,7 @@ modelAndPlot("Intercept + RT_precrit + Coherence",
              y.unit,
              y.range,
              y.range.res,
-             coef.plot = FALSE)
+             coef.plot = TRUE)
 ```
 
 ```{r, results = FALSE, echo = FALSE, fig.width=9, fig.height=5}
@@ -733,16 +732,16 @@ modelAndPlot("Intercept + RT_precrit + Inference",
              y.unit,
              y.range,
              y.range.res,
-             coef.plot = FALSE)
+             coef.plot = TRUE)
 ```
 
-Next, Association + Coherence together are added to the model, first without an interaction term between them...
+We can also add both Inference and Coherence to the baseline model (on the assumption that collinearity does not pose a problem to linear regression per se, without performing inferential statistics):
 
 ```{r, results = FALSE, echo = FALSE, fig.width=9, fig.height=5}
 m.formula <- makeFormula(DV,
-                         IVs = "1 + logRT_precrit + Association + Coherence",
+                         IVs = "1 + logRT_precrit + Inference + Coherence",
                          rand.ef = rand.ef)
-modelAndPlot("Full model (no interaction)",
+modelAndPlot("Intercept + RT_precrit + Inference + Coherence",
              m.formula,
              df,
              m.type,
@@ -751,17 +750,24 @@ modelAndPlot("Full model (no interaction)",
              y.unit,
              y.range,
              y.range.res,
-             coef.plot = FALSE)
+             coef.plot = TRUE)
+
+# VIF scores per region:
+for (r in regions) {
+  m <- lmer(m.formula, data=filter(df, Region == r))
+  print(car::vif(m))
+}
 ```
 
-...and then with an interaction term between Association and Coherence, leading again to improved model fit (this is the full model):
+So far, we have focused on assessing the influence of individual predictors in isolation (as well as the correlated Inference+Coherence). 
+
+In the next step, we can add Association to the previously constructed model (still following Smith & Kutas 2015 in keeping collinear predictors despite the potential for variance inflation):
 
 ```{r, results = FALSE, echo = FALSE, fig.width=9, fig.height=5}
 m.formula <- makeFormula(DV,
-                         IVs = "1 + logRT_precrit + Association + Coherence +
-                         AssocCoherence",
+                         IVs = "1 + logRT_precrit + Inference + Coherence + Association",
                          rand.ef = rand.ef)
-modelAndPlot("Full model (with interaction)",
+modelAndPlot("Intercept + RT_precrit + Inference + Coherence + Association",
              m.formula,
              df,
              m.type,
@@ -770,18 +776,22 @@ modelAndPlot("Full model (with interaction)",
              y.unit,
              y.range,
              y.range.res,
-             coef.plot = FALSE)
+             coef.plot = TRUE)
+# VIF scores per region:
+for (r in regions) {
+  m <- lmer(m.formula, data=filter(df, Region == r))
+  print(car::vif(m))
+}
 ```
 
-Next, we can also check if it helps to include Block, TrialNumber and/or Target noun length as predictors.
-**However, as these factors were counterbalanced across lists / conditions, they are not hypothesized to lead to improvements in model fit.**
+Finally, we can also add the hypothesized interaction term for Association:Inference to the model (note that the interaction term is computed from the scaled predictors, instead of being computed individually from the raw predictors and then scaled as a product, since the latter approach leads to huge inflation of variance in the model coefficients):
 
-```{r results = FALSE, echo = FALSE}
+```{r, results = FALSE, echo = FALSE, fig.width=9, fig.height=5}
 m.formula <- makeFormula(DV,
-                         IVs = "1 + logRT_precrit + Association + Coherence +
-                         AssocCoherence + TrialNum",
+                         IVs = "1 + logRT_precrit + Coherence +
+                         Association*Inference",
                          rand.ef = rand.ef)
-modelAndPlot("Full model with Trial Number as predictor",
+modelAndPlot("Intercept + RT_precrit + Inf + Co + Assoc + Assoc:Inf",
              m.formula,
              df,
              m.type,
@@ -790,7 +800,85 @@ modelAndPlot("Full model with Trial Number as predictor",
              y.unit,
              y.range,
              y.range.res,
-             coef.plot = FALSE)
+             coef.plot = TRUE)
+
+for (r in regions) {
+  m <- lmer(m.formula, data=filter(df, Region == r))
+  print(car::vif(m))
+}
+```
+
+```{r, include = FALSE, echo = FALSE, fig.width=9, fig.height=5}
+# In addiion, we can also add ContextRT, DecisionRT and TrialNumber to test
+# if this has an impact on the model predictions & effect sizes:
+m.formula <- makeFormula(DV,
+                         IVs = "1 + logRT_precrit + Coherence +
+                         Association*Inference  + scale(ContextRT) +
+                         scale(DecisionRT) + scale(TrialNum)",
+                         rand.ef = rand.ef)
+modelAndPlot("Intercept + RT_precrit + Inf + Co + Assoc + Assoc:Inf",
+             m.formula,
+             df,
+             m.type,
+             regions,
+             DV,
+             y.unit,
+             y.range,
+             y.range.res,
+             coef.plot = TRUE)
+```
+
+This shows an interesting pattern in the coefficient and effect size plots: while Inference is determined by the model as having a positive-going and significant effect in the first spillover region and Coherence is not, this is reversed in the post-spillover region where Coherence is predicted to have a positive, significant effect while the effect of Inference even becomes numerically negative from the model's point of view.
+
+This then demonstrates how, when given collinear predictors, the model can exploit which predictor best maximizes fit in each region, and place positive or negative weights accordingly, irrespective of the correlation between the predictors.
+
+This phenomenon however also makes the models more prone to overfit to noise in the data.
+
+As a sanity check, we can also compute a model in which we remove the collinear predictor Coherence, to check if the effect of Inference then reverses in the post-spillover region:
+
+```{r, results = FALSE, echo = FALSE, fig.width=9, fig.height=5}
+m.formula <- makeFormula(DV,
+                         IVs = "1 + logRT_precrit +
+                         Association*Inference",
+                         rand.ef = rand.ef)
+modelAndPlot("Intercept + RT_precrit + Inf + Assoc + Assoc:Inf",
+             m.formula,
+             df,
+             m.type,
+             regions,
+             DV,
+             y.unit,
+             y.range,
+             y.range.res,
+             coef.plot = TRUE)
+
+for (r in regions) {
+  m <- lmer(m.formula, data=filter(df, Region == r))
+  print(car::vif(m))
+}
+```
+
+As speculated, the reversal of the sign for Inference is exactly what is observed in the post-critical region, with a significant, positive effect for this predictor. 
+
+As another sanity check, we can also check if it helps to include  TrialNumber as a predictor.
+However, as trial order of items and conditions was counterbalanced across lists, this should not lead to improvements in model fit, even if it will be a hightly significant predictor.
+
+```{r, results = FALSE, echo = FALSE, fig.width=9, fig.height=5}
+df$TrialNum <- scale(df$TrialNum)
+m.formula <- makeFormula(DV,
+                         IVs = "1 + logRT_precrit + Coherence +
+                         Association*Inference + TrialNum",
+                         rand.ef = rand.ef)
+modelAndPlot("Intercept + RT_precrit + Inf + Co + Assoc + Assoc:Inf + TrialNum",
+             m.formula,
+             df,
+             m.type,
+             regions,
+             DV,
+             y.unit,
+             y.range,
+             y.range.res,
+             coef.plot = TRUE)
 ```
 
 
@@ -837,7 +925,7 @@ modelAndPlot("Intercept model on data subset: Conditions A+B",
              coef.plot = FALSE)
 ```
 
-**Preliminary observations:**
+**Observations:**
 
 - Log-transformation of the predictor variable does not lead to improved fit, except very slightly for precritical RT in regions 0-2 (as predicted). Therefore, the original (scaled) versions of the predictors will be kept, except for precritical RT.
 - Subset conditions A + B:
@@ -849,37 +937,17 @@ modelAndPlot("Intercept model on data subset: Conditions A+B",
 - Subset conditions C + D:
   - **Association** can model the difference between C and D very well in the post-spillover region
 
-**C) Compare the collinear predictors Inference, Coherence on the full set of conditions**
-
-Use residual plots to compare the collinear predictors:
-
-```{r, echo = FALSE, results = FALSE, fig.width=10, fig.height=4}
-f1 <- makeFormula(DV,
-                  IVs = "1 + Inference",
-                  rand.ef = rand.ef)
-df.m1 <- runModels(df, model.type=m.type, f1)
-p1 <- plotSPR(df.m1, "Residuals", y.unit, y.range.res) + ggtitle("Residuals: Inference")
-#ggsave("./plots/residuals_Inference.pdf", last_plot(), width=3.5, height=3)
-
-f2 <- makeFormula(DV,
-                  IVs = "1 + Coherence",
-                  rand.ef = rand.ef)
-df.m2 <- runModels(df, model.type=m.type, f2)
-p2 <- plotSPR(df.m2, "Residuals", y.unit, y.range.res) + ggtitle("Residuals: Coherence")
-
-p <- grid.arrange(p1, p2, nrow=1)
-ggsave("./plots/residuals_Inf_Co.pdf", p, width=10, height=4)
-```
-
 
 ## Neutralizing predictors
+
+### Full model + coefficients and effect size
 
 We start from the full chosen model: 
 
 ```{r, results = FALSE, echo = FALSE, fig.width=9, fig.height=5}
 m.formula <- makeFormula(DV,
-                         IVs = "1 + logRT_precrit + Association + Coherence +
-                         AssocCoherence",
+                         IVs = "1 + logRT_precrit + Coherence + Association +
+                         Inference + Association:Inference",
                          rand.ef = rand.ef)
 modelAndPlot("Full model (with interaction)",
              m.formula,
@@ -890,39 +958,24 @@ modelAndPlot("Full model (with interaction)",
              y.unit,
              y.range,
              y.range.res,
-             coef.plot = FALSE)
-
-# Get coefficient plot and effect size plot
-m <- runModels(df, model.type=m.type, m.formula, regions=regions)
-p.coef <- plotCoefs(m)
-p.effect <- plotEffects(m)
-
-p <- grid.arrange(p.coef, p.effect, nrow=1,
-             top = textGrob("Full model: Coefficients + Effect size",
-                            gp=gpar(fontsize=14)))
-
-ggsave("./plots/coef_effectsize.pdf", plot = p,
-       width = 10, height = 4, dpi = 300)
+             coef.plot = TRUE)
 ```
 
 **Comparing by-subject linear model, lmer with / without random intercepts for items:**
 
 ```{r}
 # Linear model by-subjects:
-f1 <- makeFormula(DV, IVs = "1 + logRT_precrit + Association + Coherence +
-                         AssocCoherence",
+f1 <- makeFormula(DV, IVs = "1 + logRT_precrit + Coherence + Association*Inference",
                          rand.ef = "")
 m1 <- runModels(df, "lm.by.subj", f1, regions)
 
 # LMER without by-item random intercepts:
-f2 <- makeFormula(DV, IVs = "1 + logRT_precrit + Association + Coherence +
-                         AssocCoherence",
+f2 <- makeFormula(DV, IVs = "1 + logRT_precrit + Coherence + Association*Inference",
                          rand.ef = " + (1|Subject)")
 m2 <- runModels(df, "lmer", f2, regions)
 
 # LMER with by-item random intercepts:
-f3 <- makeFormula(DV, IVs = "1 + logRT_precrit + Association + Coherence +
-                         AssocCoherence",
+f3 <- makeFormula(DV, IVs = "1 + logRT_precrit + Coherence + Association*Inference",
                          rand.ef = " + (1|Subject) + (1|Item)")
 m3<- runModels(df, "lmer", f3, regions)
 
@@ -939,107 +992,94 @@ ggsave(paste0("./plots/residual_comparison_item_random_intercepts.pdf"), p,
        width = 10, height = 5, dpi = 300)
 ```
 
-### Setting predictors to zero
 
-**Currently the following plots are still not the lmer models!**
+### Controlling individual predictors
 
 **Model formula for the full model:**
 
-*logRT ~ Association + Coherence + Association:Coherence + Precritical_RT*
+*logRT ~ logRT_precrit + Association + Coherence + Inference + Association:Inference*
 
-```{r, include = FALSE, fig.height = 7, fig.width = 14}
+```{r, fig.height = 3, fig.width = 6}
 m.formula <- makeFormula(DV,
-                         IVs = "1 + logRT_precrit + Association + Coherence +
-                         AssocCoherence",
+                         IVs = "1 + logRT_precrit + Coherence + Association +
+                         Inference + Association:Inference",
                          rand.ef = rand.ef)
+
+# Specify which random effects to include when generating model predictions
+rand.ef.cols <- c("RanEfSubject", "RanEfItem")
 
 m <- runModels(df,
                m.type,
                m.formula,
                regions)
 
-# Set predictors to zero: start with all zero except the intercept,
-# then add in more predictors
+# Specify full model IVs:
+model.ivs <- c(precrit, "Association", "Inference", "Coherence",
+               "Association:Inference")
 
-# Plot only the intercept
-m$InterceptOnly <- m$`Coef_(Intercept)`
-plotSPR(m, "InterceptOnly", y.unit, y.range)
+# Readjust the residuals y-axis (make larger, since larger residuals arise)
+y.range.res <- c(-0.11, 0.11)
 
-# Add association only
-m$InterceptAssoc <- m$`Coef_(Intercept)` +
-  m$Association * m$Coef_Association 
-plotSPR(m, "InterceptAssoc", y.unit, y.range)
+# Sanity check 1: remove ALL predictors (yields intercept model)
+neutralizePredictors(m,
+                     neutralize=model.ivs,
+                     model.ivs,
+                     rand.ef.cols = rand.ef.cols)
 
-# Add coherence only
-m$InterceptCoherence <- m$`Coef_(Intercept)` +
-  m$Coherence * m$Coef_Coherence
-plotSPR(m, "InterceptCoherence",  y.unit, y.range)
+# Sanity check 2: remove all predictors except precritical RT
+neutralizePredictors(m,
+                     neutralize=model.ivs[! model.ivs == precrit],
+                     model.ivs,
+                     rand.ef.cols = rand.ef.cols)
 
-# Add interaction only
-m$AssocCoherence <- m$`Coef_(Intercept)` +
-  m$AssocCoherence * m$Coef_AssocCoherence
-plotSPR(m, "AssocCoherence",  y.unit, y.range)
 
-# Add precritical only 
-m$InterceptPrecrit <- m$`Coef_(Intercept)` +
-  m$logRT_precrit * m$Coef_logRT_precrit
-plotSPR(m, "InterceptPrecrit",  y.unit, y.range)
+### Neutralizing individual predictors
+neutralizePredictors(m, neutralize=c("Association"), model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+neutralizePredictors(m, neutralize=c("Coherence"), model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+neutralizePredictors(m, neutralize=c("Inference"), model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+neutralizePredictors(m, neutralize=c("Association:Inference"), model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+neutralizePredictors(m, neutralize=precrit, model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+
+### Isolating predictors (ie. neutralizing everything else except intercept)
+
+# Keep only Association
+neutralizePredictors(m,
+                     neutralize=model.ivs[! model.ivs == "Association"],
+                     model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+
+# Keep only Inference
+neutralizePredictors(m,
+                     neutralize=model.ivs[! model.ivs == "Inference"],
+                     model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+
+# Keep only Coherence
+neutralizePredictors(m,
+                     neutralize=model.ivs[! model.ivs == "Coherence"],
+                     model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+
+# Keep only Interaction
+neutralizePredictors(m,
+                     neutralize=model.ivs[! model.ivs ==
+                                            "Association:Inference"],
+                     model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+
+
+### Isolating pairs of variables 
+# Keep only Inference + Coherence
+neutralizePredictors(m,
+                     neutralize=model.ivs[! model.ivs %in%
+                                           c("Inference", "Coherence")],
+                     model.ivs,
+                     rand.ef.cols = rand.ef.cols)
 ```
 
-```{r, fig.height = 8, fig.width = 10}
-### Generate plots 
-y.range <- c(5.52, 5.72)
-y.range <- c(5.3, 6.3)
-# Add everything except association 
-m$InterceptCoherencePrecritInteraction <- m$`Coef_(Intercept)` +
-  m$Association * 0 +
-  m$Coherence * m$Coef_Coherence +
-  m$logRT_precrit * m$Coef_logRT_precrit +
-  m$AssocCoherence*m$`Coef_AssocCoherence`
-p1 <- plotSPR(m, "InterceptCoherencePrecritInteraction",
-        y.unit, y.range) + ggtitle("Association removed")
-
-# Add everything except coherence 
-m$InterceptAssocPrecritInteraction <- m$`Coef_(Intercept)` +
-  m$Association * m$Coef_Association +
-  m$Coherence * 0 +
-  m$logRT_precrit * m$Coef_logRT_precrit +
-  m$AssocCoherence * m$`Coef_AssocCoherence`
-p2 <- plotSPR(m, "InterceptAssocPrecritInteraction",
-        y.unit, y.range) + ggtitle("Coherence removed")
-
-# Add everything except precritical 1 
-m$InterceptAssocCoherenceInteraction <- m$`Coef_(Intercept)` +
-  m$Association * m$Coef_Association +
-  m$Coherence * m$Coef_Coherence +
-  m$logRT_precrit * 0 +
-  m$AssocCoherence * m$`Coef_AssocCoherence`
-p3 <- plotSPR(m, "InterceptAssocCoherenceInteraction", 
-        y.unit, y.range)  + ggtitle("Precritical RT removed")
-
-# Add everything except the interaction term 
-m$InterceptAssocCoherencePrecrit <- m$`Coef_(Intercept)` +
-  m$Association * m$Coef_Association +
-  m$Coherence * m$Coef_Coherence +
-  m$logRT_precrit * m$Coef_logRT_precrit +
-  m$AssocCoherence * 0
-p4 <- plotSPR(m, "InterceptAssocCoherencePrecrit",
-        y.unit, y.range)  + ggtitle("Interaction term removed")
-
-# Sanity check: full model 
-m$Full <- m$`Coef_(Intercept)` +
-  m$Association*m$Coef_Association  +
-  m$Coherence*m$Coef_Coherence +
-  m$logRT_precrit*m$Coef_logRT_precrit +
-  m$AssocCoherence * m$`Coef_AssocCoherence`
-p5 <- plotSPR(m, "Full", y.unit, y.range) + ggtitle("FULL MODEL")
-
-# Observed data 
-p.observed <- plotSPR(m, DV,  y.unit, y.range) + ggtitle("OBSERVED RTS")
-
-grid.arrange(p1, p2, p3, 
-             p4, p5, p.observed,
-             nrow=2,
-             top = textGrob("Setting individual predictors to zero", gp=gpar(fontsize=14, fontface=2)))
-```
 
