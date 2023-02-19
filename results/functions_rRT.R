@@ -84,7 +84,7 @@ runModels <- function(df,
                       model.type,
                       m.formula,
                       regions = -1:2,
-                      print.checks=FALSE) {
+                      print.checks = FALSE) {
   
   # Print chosen model type 
   model.types <- c("lm" = "simple LM",
@@ -184,15 +184,17 @@ runModels <- function(df,
         rand.ef.items <- rand.ef$Item
         rand.ef.items$Item <- rownames(rand.ef.items)
         colnames(rand.ef.items) <- c("RanEfItem", "Model_Item")
-        output.region <- merge(output.region, rand.ef.items,
-                               by=c("Model_Item"), all=TRUE)
+        output.region <- suppressMessages(plyr::join(output.region,
+                                                     rand.ef.items,
+                                                     by=c("Model_Item")))
       }
       if ("Subject" %in% names(rand.ef)) {
         rand.ef.subj <- rand.ef$Subject
         rand.ef.subj$Subject <- rownames(rand.ef.subj)
         colnames(rand.ef.subj) <- c("RanEfSubject", "Model_Subject")
-        output.region <- merge(output.region, rand.ef.subj,
-                               by=c("Model_Subject"), all=TRUE)
+        output.region <- suppressMessages(plyr::join(output.region,
+                                                     rand.ef.subj,
+                                                     by=c("Model_Subject")))
       }
 
       # Bind to original df (or create)
@@ -742,3 +744,4 @@ getMeanAICBIC <- function(df, f, measure, regions=-1:2) {
   }
   mean(scores)  # return the mean across regions
 }
+

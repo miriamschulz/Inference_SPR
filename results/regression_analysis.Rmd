@@ -977,7 +977,7 @@ m2 <- runModels(df, "lmer", f2, regions)
 # LMER with by-item random intercepts:
 f3 <- makeFormula(DV, IVs = "1 + logRT_precrit + Coherence + Association*Inference",
                          rand.ef = " + (1|Subject) + (1|Item)")
-m3<- runModels(df, "lmer", f3, regions)
+m3 <- runModels(df, "lmer", f3, regions)
 
 #p1 <- plotSPR(m1, "Residuals", y.unit, c(-0.04, 0.04)) + ggtitle("By-subject linear model")
 #p2 <- plotSPR(m2, "Residuals", y.unit, c(-0.04, 0.04)) + ggtitle("LMER: no by-item intercept")
