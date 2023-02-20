@@ -1072,12 +1072,46 @@ neutralizePredictors(m,
                      model.ivs,
                      rand.ef.cols = rand.ef.cols)
 
+### Isolate individual predictors, but also keep precriticalRT as predictor besides the intercept:
+
+# Keep only Association+precrit
+neutralizePredictors(m,
+                     neutralize=model.ivs[! model.ivs %in% c(precrit, "Association")],
+                     model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+
+# Keep only Inference+precrit
+neutralizePredictors(m,
+                     neutralize=model.ivs[! model.ivs %in% c(precrit, "Inference")],
+                     model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+
+# Keep only Coherence+precrit
+neutralizePredictors(m,
+                     neutralize=model.ivs[! model.ivs %in% c(precrit, "Coherence")],
+                     model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+
 
 ### Isolating pairs of variables 
 # Keep only Inference + Coherence
 neutralizePredictors(m,
                      neutralize=model.ivs[! model.ivs %in%
                                            c("Inference", "Coherence")],
+                     model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+
+# Keep Association + Coherence
+neutralizePredictors(m,
+                     neutralize=model.ivs[! model.ivs %in%
+                                           c("Association", "Coherence")],
+                     model.ivs,
+                     rand.ef.cols = rand.ef.cols)
+
+# Keep Association, Inference + Coherence
+neutralizePredictors(m,
+                     neutralize=model.ivs[! model.ivs %in%
+                                           c("Association", "Inference", "Coherence")],
                      model.ivs,
                      rand.ef.cols = rand.ef.cols)
 ```
