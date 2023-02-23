@@ -84,16 +84,13 @@ Criteria:
 # Check the original range of the RTs
 range(reads$RT)
 
-# Define thresholds for data exclusion
-min.threshold <- 50
-max.threshold <- 2500
-
-# Filter RTs to lie within chosen range
 reads <- removeOutliersSPR(reads,
-                           c(min.threshold, max.threshold),
-                           entire.trial = TRUE)
-
-reads <- removeOutliersContext(reads, min.rt = 500, max.rt = 30000)
+                        method = "sd",
+                        sd.value = 4,
+                        entire.trial = TRUE,
+                        regions = -1:2)
+# Remove outliers: context sentence reading times
+reads <- removeOutliersContext(reads, min.rt=500, max.rt=30000)
 
 # Remove trials with incorrect plausibility rating
 reads <- removeIncorrect(reads)
@@ -113,10 +110,10 @@ line.plot <- function(df) {
     y.axis.range <- c(225, 360)
   }
   p <- df %>%
-    ggplot(aes(x = Region, y = MeanRT, color=Cond, group=Cond)) + 
+    ggplot(aes(x = Region, y = Mean, color=Cond, group=Cond)) + 
       geom_point(size=2.5, shape="cross") + 
       geom_line(linewidth=0.5) +
-      geom_errorbar(aes(ymin = MeanRT - SE, ymax = MeanRT + SE),
+      geom_errorbar(aes(ymin = Mean - SE, ymax = Mean + SE),
                     width=0.1, linewidth=0.3) +
       geom_vline(xintercept=0, linetype="dashed") +
       #geom_smooth(method = 'lm', se=TRUE, alpha = .2, aes(fill=Cond)) +
@@ -124,7 +121,11 @@ line.plot <- function(df) {
                          values=c("cornflowerblue", "chartreuse3",
                                   "tomato2", "darkgoldenrod1")) +
       ylim(y.axis.range) +
-      theme_minimal()
+      theme_minimal() + 
+    scale_x_discrete(labels=c("-1" = "Pre-critical", 
+                                         "0" = "Critical",
+                                         "1" = "Spillover", 
+                                         "2" = "Post-spillover"))
   p
 }
 ```
@@ -141,7 +142,7 @@ set.seed(seed)
 
 # Set parameters and initialize
 Nsamples.per.list <- 3
-Niterations <- 9
+Niterations <- 8
 means.cond.list <- list()
 plot.list <- list()
 log.RTs = TRUE  # if TRUE, use log RTs, else raw RTs
@@ -160,11 +161,13 @@ for (i in 1:Niterations) {
   # Aggregate sampled data 
   if (log.RTs == TRUE) {
     means.cond.sample <-
-      aggMeansSE(reads.sample, c("logRT", "Cond", "Region"))
-    colnames(means.cond.sample) <- c("Cond", "Region", "MeanRT", "SE")
+      means.cond.sample <- aggregMeans(reads.sample,
+                                       as.formula(logRT ~ Cond+Region),
+                                       n=Nsamples.per.list*4)
   } else {
-    means.cond.sample <-
-      aggMeansSE(reads.sample, c("RT", "Cond", "Region"))
+      means.cond.sample <- aggregMeans(reads.sample,
+                                       as.formula(RT ~ Cond+Region),
+                                       n=Nsamples.per.list*4)
   }
   means.cond.sample$Iteration <- i  # annotate iteration
   means.cond.list[[i]] <- as.data.frame(means.cond.sample)
@@ -180,18 +183,22 @@ filename <- paste0("./plots/sample_",
                    "subj_", Niterations,
                    "reps_seed", seed, "_balanced_lists", 
                    ifelse(log.RTs == TRUE, "_log", ""),
-                   ".png")
+                   ".pdf")
 #png(file=filename, width = 1200, height = 800)  # good size for 12 samples
-png(file=filename, width = 900, height = 600)   # good size for 9 samples
-p <- grid.arrange(grobs = plot.list, nrow = 3,
-                  top = textGrob(paste0("Mean ", 
-                                       ifelse(log.RTs == TRUE, "log ", ""),
-                                       " RTs for subsets of ",
-                                       Nsamples.per.list*4,
-                                       " randomly sampled subjects (",
-                                       Nsamples.per.list, 
-                                       " per list)"),
-                                 gp=gpar(fontsize=20, fontface=2)))
+pdf(file=filename, width = 8.6, height = 11)   # good size for 8 samples
+p <- grid.arrange(grobs = plot.list, ncol=2,
+                  top = textGrob(""),
+                  gp=gpar(fontsize=4, fontface=2))
+
+                  # Add title
+                  # top = textGrob(paste0("Mean ", 
+                  #                      ifelse(log.RTs == TRUE, "log ", ""),
+                  #                      " RTs for subsets of ",
+                  #                      Nsamples.per.list*4,
+                  #                      " randomly sampled subjects (",
+                  #                      Nsamples.per.list, 
+                  #                      " per list)"),
+                  #                gp=gpar(fontsize=20, fontface=2)))
 dev.off()
 plot(p)
 ```
@@ -201,7 +208,7 @@ plot(p)
 
 Calculate standard deviations of the different samples as a numeric indicator of the variability in the data.
 
-```{r}
+```{r eval = FALSE}
 # Turn the list of dataframes for each iteration into a single dataframe
 means.cond.df <- bind_rows(means.cond.list)
 aggMeansSE(means.cond.df, c("MeanRT", "Cond", "Region"))
