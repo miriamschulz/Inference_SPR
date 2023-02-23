@@ -110,8 +110,8 @@ qqnorm(log(df$RT),
        pch=16,
        main='QQ plot of log-transformed RTs')
 # Save plot
-ggsave("./plots/RT_hist_QQ_preDataExclusion.pdf", plot = last_plot(),
-       width = 10, height = 10, dpi = 300)
+#ggsave("./plots/RT_hist_QQ_preDataExclusion.pdf", plot = last_plot(),
+#       width = 10, height = 10, dpi = 300)
 par(mfrow=c(1,1))  # reset
 ```
 
@@ -170,8 +170,8 @@ qqnorm(log(df$RT),
        pch=16,
        main='QQ plot of log-transformed RTs')
 # Save plot
-ggsave("./plots/RT_hist_QQ_postDataExclusion.pdf", plot = last_plot(),
-       width = 10, height = 10, dpi = 300)
+#ggsave("./plots/RT_hist_QQ_postDataExclusion.pdf", plot = last_plot(),
+#       width = 10, height = 10, dpi = 300)
 par(mfrow=c(1,1))  # reset
 ```
 
@@ -240,7 +240,7 @@ p <-
   theme(legend.position="None",
         text = element_text(size = 13))
 filename <- paste0("./plots/", "context_RT.pdf")
-ggsave(filename, plot = p, width = 3, height = 3)
+ggsave(filename, plot = p, width = 4, height = 3)
 p + ggtitle("Context sentence RT by condition")
 ```
 
@@ -500,11 +500,13 @@ spill2 <- filter(df, Region==2)
 
 #f <- as.formula(logRT ~ Cond + logRT_precrit + (1|Subject) + (1|Item))
 f <- as.formula(logRT ~ BinaryCoherence*BinaryAssociation + logRT_precrit + (1|Subject) + (1|Item))
+# With random slopes but no correlations:
+#f <- as.formula(logRT ~ BinaryCoherence*BinaryAssociation + logRT_precrit + (1+logRT_precrit || Subject) + (1+logRT_precrit || Item))
 
 #######################
 ### CRITICAL REGION ###
 #######################
-
+options(scipen = 999) 
 summary(lmer(f, data=crit))
 
 ##############################
@@ -518,6 +520,7 @@ summary(lmer(f, data=spill1))
 ###############################
 
 summary(lmer(f, data=spill2))
+options(scipen = 0)
 ```
 
 
@@ -680,7 +683,8 @@ modelAndPlot("Intercept + Precritical RT",
              y.unit,
              y.range,
              y.range.res,
-             coef.plot = FALSE)
+             coef.plot = FALSE,
+             observed.plot = TRUE)
 ```
 
 In a next step, Association is added as a further predictor to the model, again not leading to drastic improvements in fit:
@@ -808,8 +812,22 @@ for (r in regions) {
 }
 ```
 
+Same model with more complex random effects structure (removing correlations, but already leads to singular fits):
+
+```{r, results = FALSE, echo = FALSE, fig.width=9, fig.height=5}
+rand.ef.complex <- " + (1+Inference+Coherence+Association || Subject) + (1+Inference+Coherence+Association || Item)"
+m.formula <- makeFormula(DV,
+                         IVs = "1 + logRT_precrit + Coherence +
+                         Association*Inference",
+                         rand.ef = rand.ef.complex)
+summary(lmer(m.formula, data=crit))
+summary(lmer(m.formula, data=spill1))
+summary(lmer(m.formula, data=spill2))
+```
+
+
 ```{r, include = FALSE, echo = FALSE, fig.width=9, fig.height=5}
-# In addiion, we can also add ContextRT, DecisionRT and TrialNumber to test
+# In addition, we can also add ContextRT, DecisionRT and TrialNumber to test
 # if this has an impact on the model predictions & effect sizes:
 m.formula <- makeFormula(DV,
                          IVs = "1 + logRT_precrit + Coherence +
@@ -961,37 +979,6 @@ modelAndPlot("Full model (with interaction)",
              coef.plot = TRUE)
 ```
 
-**Comparing by-subject linear model, lmer with / without random intercepts for items:**
-
-```{r}
-# Linear model by-subjects:
-f1 <- makeFormula(DV, IVs = "1 + logRT_precrit + Coherence + Association*Inference",
-                         rand.ef = "")
-m1 <- runModels(df, "lm.by.subj", f1, regions)
-
-# LMER without by-item random intercepts:
-f2 <- makeFormula(DV, IVs = "1 + logRT_precrit + Coherence + Association*Inference",
-                         rand.ef = " + (1|Subject)")
-m2 <- runModels(df, "lmer", f2, regions)
-
-# LMER with by-item random intercepts:
-f3 <- makeFormula(DV, IVs = "1 + logRT_precrit + Coherence + Association*Inference",
-                         rand.ef = " + (1|Subject) + (1|Item)")
-m3 <- runModels(df, "lmer", f3, regions)
-
-#p1 <- plotSPR(m1, "Residuals", y.unit, c(-0.04, 0.04)) + ggtitle("By-subject linear model")
-#p2 <- plotSPR(m2, "Residuals", y.unit, c(-0.04, 0.04)) + ggtitle("LMER: no by-item intercept")
-#p3 <- plotSPR(m3, "Residuals", y.unit, c(-0.04, 0.04)) + ggtitle("LMER: by-item intercept")
-p1 <- plotSPR(m1, "Residuals", y.unit, y.range.res) + ggtitle("By-subject linear model")
-p2 <- plotSPR(m2, "Residuals", y.unit, y.range.res) + ggtitle("LMER: subject intercept")
-p3 <- plotSPR(m3, "Residuals", y.unit, y.range.res) + ggtitle("LMER: subject + item intercepts")
-p <- grid.arrange(p1, p2, p3, nrow=1,
-                  top = textGrob(paste0("Residuals: linear/lmer model with/without by-item random intercepts"),
-                                 gp=gpar(fontsize=14, fontface=2)))
-ggsave(paste0("./plots/residual_comparison_item_random_intercepts.pdf"), p, 
-       width = 10, height = 5, dpi = 300)
-```
-
 
 ### Controlling individual predictors
 
@@ -999,7 +986,7 @@ ggsave(paste0("./plots/residual_comparison_item_random_intercepts.pdf"), p,
 
 *logRT ~ logRT_precrit + Association + Coherence + Inference + Association:Inference*
 
-```{r, fig.height = 3, fig.width = 6}
+```{r, fig.height = 3, fig.width = 9}
 m.formula <- makeFormula(DV,
                          IVs = "1 + logRT_precrit + Coherence + Association +
                          Inference + Association:Inference",
@@ -1117,3 +1104,37 @@ neutralizePredictors(m,
 ```
 
 
+
+### Comparing by-subject linear model, lmer with / without random intercepts for items
+
+```{r}
+# Linear model by-subjects:
+f1 <- makeFormula(DV, IVs = "1 + logRT_precrit + Coherence + Association*Inference",
+                         rand.ef = "")
+m1 <- runModels(df, "lm.by.subj", f1, regions)
+
+# LMER without by-item random intercepts:
+f2 <- makeFormula(DV, IVs = "1 + logRT_precrit + Coherence + Association*Inference",
+                         rand.ef = " + (1|Subject)")
+m2 <- runModels(df, "lmer", f2, regions)
+
+# LMER with by-item random intercepts:
+f3 <- makeFormula(DV, IVs = "1 + logRT_precrit + Coherence + Association*Inference",
+                         rand.ef = " + (1|Subject) + (1|Item)")
+m3 <- runModels(df, "lmer", f3, regions)
+
+y.range.res.modelcomp <-  c(-0.04, 0.04)
+#y.range.res.modelcomp <-  c(-0.07, 0.07)
+#y.range.res.modelcomp <-  c(-0.05, 0.05)
+p1 <- plotSPR(m1, "Residuals", y.unit, y.range.res.modelcomp) +
+  ggtitle("By-subject linear model")
+p2 <- plotSPR(m2, "Residuals", y.unit, y.range.res.modelcomp) +
+  ggtitle("LMER: subject intercepts")
+p3 <- plotSPR(m3, "Residuals", y.unit, y.range.res.modelcomp) +
+  ggtitle("LMER: subject + item intercepts")
+p <- grid.arrange(p1, p2, p3, nrow=1)#,
+                  #top = textGrob(paste0("Residuals: linear/lmer model with/without by-item random intercepts"),
+                                 #gp=gpar(fontsize=14, fontface=2)))
+ggsave(paste0("./plots/residual_comparison_item_random_intercepts.pdf"), p, 
+       width = 10, height = 5, dpi = 300)
+```
