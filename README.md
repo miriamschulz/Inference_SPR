@@ -3,9 +3,9 @@
 
 ## 1. General information
 
-This directory contains the materials and results of the self-paced-reading study for my master's thesis experiment on inference generation.
+This directory contains the materials and results for a self-paced-reading study on inference generation.
 
-Experimental design: 2 x 2 within subjects context manipulation, crossing the factors Event Association x Inference.
+Experimental design: 2 x 2 context manipulation.
 
 8 lists (4 Latin lists in pseudorandomized order; 2 versions of each list, with button order / trial order reversed in the second version of each).
 
@@ -16,29 +16,26 @@ SPR experiment on PCIbex:
 
 ## 2. Files and folders in this directory
 
-- `format_stimuli` folder: contains the R-scripts used to prepare the items for PCIbex: pseudorandomize the lists and put the items into the required format (`.csv` item tables).
 - `ibex_files` folder: contains the PCIbex experiment files
 - `results` folder: contains the full downloaded PCIbex results (`results.csv`) and the R-scripts to process the results:
-  - `preprocess.Rmd`:
+  - `preprocess.{Rmd|html}`:
     - Reads in the raw file from PCIbex.
     - Annotates subject and list numbers / button order, trial number, etc.
     - Removes the subject excluded for timing out + extremely long RTs
     - Merges the results with the stimuli/pretests file and exports this as `results_reads.csv`.
     - Also exports demographics and experimental survey answers by participants as `results_survey.csv`.
-  - `inspect.Rmd`:
+  - `inspect.{Rmd|html}`:
     - performs data completeness checks
     - inspects the demographics and survey data
     - provides a first, *purely numeric/visual* inspection of the results (plausiblity ratings & reading times)
-  - `results_SPR_sample.Rmd`:
-    - Reads in the preprocessed results file and randomly samples a subset of participants from the data (equally distributed across lists) to (visually) inspect the variation in the data.
-  - `results_SPR_rRT.Rmd`:
-    - Reads in the preprocessed results file and performs a regression-based RT analysis.
-- `safety_copies` folder: contains downloaded safety copies of the full experiment for each order from PC Ibex.
+  - `pretests.{Rmd|html}`:
+    generates the pretest plots and runs pair-wise t-tests
+  - `ratings.{Rmd|html}`:
+    - contains the results of the plausibility ratings: task accuracy and reaction times
+  - `regression_analysis.{Rmd|html}`:
+    - Reads in the preprocessed results file, inspects reading times and performs a regression-based RT analysis.
 
-
-## 3. Results
-
-### 3.1 Participants and recruitment
+## 3. Summary of the SPR participants & recruitment criteria
 
 - 42 subjects were recruited through Prolific (10 per Latin list; two were excluded: one due to a technical problem on PCIbex and one due to a double submission (timed out)).
 - Prolific criteria:
@@ -64,23 +61,3 @@ SPR experiment on PCIbex:
     - Problems and remarks reported: none
     - Guesses, strategy, remarks: see exported file `Survey_textanswers.csv`. 4 participants noted that negation was a factor in the design; 1 of these noted that trials with "nie" were mostly implausible.
     - Should their data be kept, i.e. did they take part seriously? 41x yes
-
-
-
-### 3.2 Plausibility ratings and rating reaction times
-
-Mean rating per condition:
-- ...
-
-
-### 3.3 Reading times
-
-Mean critical word reading time by condition/region:
-- ...
-
-
-## 4 Time log
-
-- 30.08.2022: Format items for SPR, set up SPR
-- September 2022: Run SPR
-- October 2022: Analyze SPR data
