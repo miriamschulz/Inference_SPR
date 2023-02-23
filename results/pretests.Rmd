@@ -85,6 +85,10 @@ barplotRatings <- function(df,
     theme(text = element_text(size = 30),
           plot.title = element_text(hjust = 0.5))
   
+  if (plotname == "prodnorms") {
+    p <- p + ylab("Production Percentage")
+  }
+  
   # Save plot
   ggsave(
     paste0("./plots_pretests/barplot_", plotname, ".pdf"),
@@ -106,21 +110,33 @@ densityplotRatings <- function(df,
               aes(x = get(ratings.colname),
                   fill = Cond,
                   color = Cond)) +
-    geom_density(alpha = 0.5) +
+    geom_density(alpha = 0.4) +
     xlim(xrange) +
     #scale_x_continuous(breaks = xrange[1]:xrange[2]) +
     xlab(ratings.colname) +
     ylab("Density") +
     scale_color_manual("Condition", values = colors.dark) +
     scale_fill_manual("Condition", values = colors.bright) +
-    theme_minimal()
+    theme_minimal() + 
+    theme(text = element_text(size = 17),
+          legend.position = "right",
+          panel.grid.minor.x = element_blank(),
+          panel.grid.minor.y = element_blank())
+  
+    if (plotname == "association") {
+      p <- p +
+        scale_color_manual("Condition", values = colors.dark,
+                           labels = c("A = C", "B = D")) +
+        scale_fill_manual("Condition", values = colors.bright,
+                          labels = c("A = C", "B = D"))
+      }
   
   # Save plot
   ggsave(
     paste0("./plots_pretests/densityplot_", plotname, ".pdf"),
     plot = p,
-    width = 4,
-    height = 3,
+    width = 5,
+    height = 3.5,
     dpi = 300
   )
   p
@@ -129,10 +145,10 @@ densityplotRatings <- function(df,
 
 ### Define colors for the plots: outline (fill) and main (color)
 colors.bright <- c(
-  "A" = "lightskyblue2",
-  "B" = "chartreuse1",
-  "C" = "coral1",
-  "D" = "gold1"
+ "A" = "lightskyblue2",
+ "B" = "chartreuse1",
+ "C" = "coral1",
+ "D" = "gold1"
 )
 colors.dark <- c("A" = "cornflowerblue",
                  "B" = "chartreuse3",
@@ -154,8 +170,8 @@ Calculate the per-condition mean, SD and SE for each pretest:
 
 ```{r}
 df.ab <- filter(df, Cond %in% c("A", "B"))
-(means.prod <- aggregMeans(df.ab, as.formula(ProductionPercentage ~ Cond), n=30))
-(means.assoc <- aggregMeans(df, as.formula(AssociationRating ~ Cond), n=20))
+(means.prod <- aggregMeans(df.ab, as.formula(ProductionPercentage ~ Cond), n=40))
+(means.assoc <- aggregMeans(df, as.formula(AssociationRating ~ Cond), n=40))
 (means.inference <- aggregMeans(df, as.formula(InferenceRating ~ Cond), n=40))
 (means.coherence <- aggregMeans(df, as.formula(CoherenceRating ~ Cond), n=40))
 ```

@@ -41,6 +41,7 @@ makeFormula <- function(DV,
 #' @param y.range 
 #' @param y.range.res 
 #' @param coef.plot Boolean 
+#' @param observed.plot Boolean 
 #'
 #' @return
 #' @export
@@ -56,7 +57,8 @@ modelAndPlot <- function(plt.name,
                          y.unit,
                          y.range,
                          y.range.res,
-                         coef.plot = TRUE) {
+                         coef.plot = TRUE,
+                         observed.plot = TRUE) {
   
   # Run a model for each region
   m <- runModels(df, m.type, m.formula, regions = regions)
@@ -64,7 +66,8 @@ modelAndPlot <- function(plt.name,
   # Generate plots
   p <- generatePlots(m, plt.name, m.type,
                      DV, y.unit, y.range, y.range.res,
-                     coef.plot = coef.plot)
+                     coef.plot = coef.plot,
+                     observed.plot = observed.plot)
 }
 
 
@@ -291,15 +294,16 @@ generatePlots <- function(model.output,
                           y.unit,
                           y.range,
                           y.range.res, 
-                          coef.plot = FALSE) {
+                          coef.plot = FALSE,
+                          observed.plot = TRUE) {
   
   # Add model type to model name:
-  model.types <- c("lm" = " (simple LM)",
-                   "lmer" = " (LMER)",
-                   "lm.by.subj" = " (by-subject LMs)")
-  model.name <- paste0(model.name, model.types[model.type])
-  filename <- paste0("./plots/", DV, "_", model.name, ".pdf")
-  filename.coef <- paste0("./plots/", DV, "_", model.name, "_coef.pdf")
+  model.types <- c("lm" = "_simple_LM",
+                   "lmer" = "_LMER",
+                   "lm.by.subj" = "_by_subject_LMs")
+  filename <- paste0(model.name, model.types[model.type])
+  filename.coef <- paste0("./plots/", DV, "_", filename, "_coef.pdf")
+  filename <- paste0("./plots/", DV, "_", filename, ".pdf")
   
   # Observed data
   p.observed <- plotSPR(model.output, DV, y.unit, y.range)
@@ -316,11 +320,21 @@ generatePlots <- function(model.output,
   p.residuals <- p.residuals + ggtitle( "Residuals")
   
   # Combine into one plot
-  p <- grid.arrange(p.observed, p.estimates, p.residuals, nrow=1,
-                    top = textGrob(model.name, gp=gpar(fontsize=20)),
-                    padding=unit(2, "cm"))
-  # Save
-  ggsave(filename, plot = p, width = 12, height = 5)
+  if (observed.plot == TRUE) {
+    p <- grid.arrange(p.observed, p.estimates, p.residuals, nrow=1,
+                      #top = textGrob(model.name, gp=gpar(fontsize=20)),
+                      padding=unit(2, "cm"))
+    # Save
+    #ggsave(filename, plot = p, width = 12, height = 5)
+    ggsave(filename, plot = p, width = 10, height = 5)
+  } else {
+    p <- grid.arrange(p.estimates, p.residuals, nrow=1,
+                      #top = textGrob(model.name, gp=gpar(fontsize=20)),
+                      padding=unit(2, "cm"))
+    # Save
+    #ggsave(filename, plot = p, width = 12, height = 5)
+    ggsave(filename, plot = p, width = 7, height = 5)
+  }
   
   # Coefficients
   # Not yet supported for lm and lm.by.subj, set to FALSE for these:
@@ -337,7 +351,7 @@ generatePlots <- function(model.output,
                       #               gp=gpar(fontsize=14)))
     
     ggsave(filename.coef, plot = p.coef.eff,
-           width = 10, height = 4, dpi = 300)
+           width = 9, height = 4, dpi = 300)
   }
   p
 }
@@ -400,7 +414,7 @@ plotSPR <- function(df,
           legend.title = element_text(size=7),
           legend.text = element_text(size=7),
           legend.position = "bottom",
-          plot.margin = unit(c(0,1,0,0), "cm"), # prevent x-axis text from being cut off at the right
+          plot.margin = unit(c(0.2,1,0,0.2), "cm"), # prevent plot from being cut off at the right/top
           panel.grid.minor.x = element_blank() # remove vertical lines between x ticks
           #panel.grid.major = element_blank()
           #panel.grid.major.x = element_line(color = "grey",
@@ -630,16 +644,21 @@ compareLogToUntransformed <- function(df,
   f2 <- as.formula(get(DV) ~ 1 + get(var.log) + (1|Subject) + (1|Item))
   df.m1 <- runModels(df, model.type="lmer", f1)
   df.m2 <- runModels(df, model.type="lmer", f2)
-  p1 <- plotSPR(df.m1, "Residuals", y.unit, y.range.res) + ggtitle(var.untransformed)
-  p2 <- plotSPR(df.m2, "Residuals", y.unit, y.range.res) + ggtitle(var.log)
+  p1 <- plotSPR(df.m1, "Residuals", y.unit, y.range.res) +
+    ggtitle(var.untransformed) +
+    theme(plot.margin = unit(c(0.2,1,0,0), "cm"))
+  p2 <- plotSPR(df.m2, "Residuals", y.unit, y.range.res) +
+    ggtitle(var.log) +
+    theme(plot.margin = unit(c(0.2,1,0,0), "cm"))
   p <- grid.arrange(p1, p2, nrow=1,
                     top = textGrob(paste0("Comparing residuals for ",
                                           var.untransformed,
                                           " to ",
                                           var.log),
                                    gp=gpar(fontsize=14, fontface=2)))
-  suppressMessages(ggsave(paste0("./plots/residual_comparison_", var.untransformed, "_",
-                var.log, ".pdf"), p, dpi = 300))
+  suppressMessages(ggsave(paste0("./plots/residual_comparison_",
+                                 var.untransformed, "_",
+                var.log, ".pdf"), p, width=7, height=3.5, dpi = 300))
   #p
 }
 
@@ -696,6 +715,11 @@ neutralizePredictors <- function(m.output,
   
   m$FittedValuesControlled <- new.estimate
   m$Residuals <- m[, DV] - m$FittedValuesControlled
+
+  # Observed
+  p.observed <- plotSPR(m, "logRT",
+                         y.unit, y.range) + ggtitle("Observed RTs") + 
+    theme(plot.margin = unit(c(0.5,1,0,0.5), "cm"))
   
   # Estimates
   p.estimates <- plotSPR(m, "FittedValuesControlled",
@@ -708,8 +732,8 @@ neutralizePredictors <- function(m.output,
     theme(plot.margin = unit(c(0.5,1,0,0.5), "cm"))
   
   # Combine into one plot
-  p <- grid.arrange(p.estimates, p.residuals, nrow=1) 
-  suppressMessages(ggsave(plt.name, p, width = 6, height = 3, dpi = 300))
+  p <- grid.arrange(p.observed, p.estimates, p.residuals, nrow=1) 
+  suppressMessages(ggsave(plt.name, p, width = 9, height = 3, dpi = 300))
 }
 
 

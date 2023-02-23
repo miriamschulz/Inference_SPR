@@ -427,7 +427,6 @@ removeOutliersSPR <- function(df,
       summarize(SubjectMean = mean(RT),
                 SubjectSD = sd(RT))
     df <- merge(df, participant.SDs, by = "Subject", all = TRUE)
-    
     df$UpperBound <- df$SubjectMean + sd.value * df$SubjectSD
     df$LowerBound <- df$SubjectMean - sd.value * df$SubjectSD
     df$ExcludeTrial <-
@@ -435,9 +434,9 @@ removeOutliersSPR <- function(df,
              "yes", "no")
     
     # Print the range in means by subject
-    #cat(sprintf("Mean by subject RT ranges from %s ms to %s ms.\n",
-    #            round(min(df$SubjectMean)),
-    #            round(max(df$SubjectMean))))
+    cat(sprintf("Mean by subject RT ranges from %s ms to %s ms.\n",
+                round(min(df$SubjectMean)),
+                round(max(df$SubjectMean))))
     
     # Print the maximal distance after which data points are removed
     df$RangeRemoved <- sd.value * df$SubjectSD
