@@ -17,7 +17,7 @@ SPR experiment on PCIbex:
 ## 2. Files and folders in this directory
 
 - `ibex_files` folder: contains the PCIbex experiment files
-- `results` folder: contains the full downloaded PCIbex results (`results.csv`) and the R-scripts to process the results:
+- `results` folder: contains the cleaned and anonymized results (`results_reads.csv`) and the R-scripts to process the results:
   - `preprocess.{Rmd|html}`:
     - Reads in the raw file from PCIbex.
     - Annotates subject and list numbers / button order, trial number, etc.
